@@ -6,6 +6,7 @@ redan-patchade celler).
 
 Genomförda uppgifter (commit-historik förklarar):
 - round E: 'år N' / 'år N+1' → 'år 20' / 'år 21' (explicit horisont)
+- round B: pedagogisk omskrivning av Beräkningslogik-text (användarcentrerad)
 """
 from __future__ import annotations
 import sys, io
@@ -53,6 +54,41 @@ def round_e_year_n(wb: Workbook) -> int:
     return n_changes
 
 
+def round_b_pedagogisk(wb: Workbook) -> int:
+    """§10 punkt 1: pedagogisk omskrivning av Beräkningslogik-text (round B).
+
+    Inriktning: användarcentrerat — vad mallen ger användaren, inte bara
+    metodbeskrivning. Behåller B33-44 (Goal Seek-jämförelse + fördelar) och
+    block-rubriker B59/B121/B164/B179/B197 oförändrade.
+
+    Körs efter round_e så 'år 20' i ny text inte stör replace-logiken.
+    """
+    new_text = {
+        "B3": (
+            "Du fyller i projektets förutsättningar i Indata. Mallen räknar baklänges "
+            "till den årshyra som precis uppfyller respektive lönsamhetskrav: NPV ≥ 0, "
+            "IRR EK ≥ avkastningskrav, samt marknadsvärde ≥ bokfört värde år 20. "
+            "Den högsta av de tre kraven blir bindande kravhyra — golvet under vilket "
+            "projektet inte är lönsamt. Lösningen är analytisk (ett steg, exakt) — "
+            "beskrivet nedan."
+        ),
+        "B6":  "STEG 1 — Räkna NPV vid två testhyror (0 kr och 1 Mkr/år)",
+        "B10": "STEG 2 — Härled hur mycket NPV ändras per krona hyra (lutningen b)",
+        "B14": "STEG 3 — Lös linjärt: kravhyran är där NPV korsar noll, dvs −NPV(0) / b",
+        "B47": (
+            "Här under räknas de tre kravhyrorna ut. Block A ger NPV vid 0 kr hyra, "
+            "block B vid 1 Mkr/år — differensen ger lutningen b för NPV-kravet. "
+            "Block D-E gör samma för IRR EK. Block F gör marknadsvärdes-kravet. "
+            "Detta är inte projektets faktiska kassaflöde — det visas på Kassaflöde-fliken "
+            "vid bindande kravhyra."
+        ),
+    }
+    ws = wb["Beräkningslogik"]
+    for coord, text in new_text.items():
+        ws[coord] = text
+    return len(new_text)
+
+
 def main() -> int:
     out = ROOT / "build" / "iter9.xlsx"
     out.parent.mkdir(exist_ok=True)
@@ -64,13 +100,17 @@ def main() -> int:
     n = round_e_year_n(wb)
     print(f"   {n} celler patchade")
 
-    print(f"\n3. Sparar → {out.name}")
+    print("3. Round B: pedagogisk omskrivning av Beräkningslogik-text")
+    n = round_b_pedagogisk(wb)
+    print(f"   {n} celler patchade")
+
+    print(f"\n4. Sparar → {out.name}")
     save_iter(wb, out)
 
-    print("\n4. Recalc (Excel COM / LibreOffice)")
+    print("\n5. Recalc (Excel COM / LibreOffice)")
     recalc(out)
 
-    print("\n5. Regressionstest:")
+    print("\n6. Regressionstest:")
     res = check_baseline(out)
     if res["rent"] is not None:
         print(f"   Hyra={res['rent']:,.2f}  IRR={res['irr']:.4%}  margin={res['margin']*100:+.2f} pp")
