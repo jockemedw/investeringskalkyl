@@ -59,9 +59,9 @@ För ny §10-uppgift: lägg till `round_X_*(wb)` i [build/iter9.py](build/iter9.
 
 Status (senaste rad = överst):
 
+- [x] Round C: Indata-fält renamning — branschterminologi
 - [x] Round E: "År N" → "år 20" (commit c423d5e)
 - [x] Round B: pedagogisk omskrivning Beräkningslogik (commit dab830b)
-- [ ] Indata-fält renamning (Avskrivningstakt, räntenivå)
 - [ ] Designcleanup Lönsamhetskontroll (round F)
 - [ ] Full design review
 

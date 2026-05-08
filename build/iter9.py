@@ -7,6 +7,7 @@ redan-patchade celler).
 Genomförda uppgifter (commit-historik förklarar):
 - round E: 'år N' / 'år N+1' → 'år 20' / 'år 21' (explicit horisont)
 - round B: pedagogisk omskrivning av Beräkningslogik-text (användarcentrerad)
+- round C: Indata-fält renamning till branschterminologi
 """
 from __future__ import annotations
 import sys, io
@@ -52,6 +53,28 @@ def round_e_year_n(wb: Workbook) -> int:
                     c.value = new_val
                     n_changes += 1
     return n_changes
+
+
+def round_c_indata_rename(wb: Workbook) -> int:
+    """§10: Indata-fält renamning till branschterminologi.
+
+    Tre celler byter etikett:
+    - Indata!B18: 'Avskrivnings-% per år' → 'Avskrivningstakt'
+    - Indata!B62: 'Långsiktig ränta' → 'Räntenivå' (matchar Finansiering!B14)
+    - Lönsamhetskontroll!B26: 'Avskrivnings-%' → 'Avskrivningstakt'
+    """
+    renames = [
+        ("Indata", "B18", "Avskrivnings-% per år", "Avskrivningstakt"),
+        ("Indata", "B62", "Långsiktig ränta", "Räntenivå"),
+        ("Lönsamhetskontroll", "B26", "Avskrivnings-%", "Avskrivningstakt"),
+    ]
+    n = 0
+    for sheet, coord, old, new in renames:
+        cell = wb[sheet][coord]
+        if cell.value == old:
+            cell.value = new
+            n += 1
+    return n
 
 
 def round_b_pedagogisk(wb: Workbook) -> int:
@@ -104,13 +127,17 @@ def main() -> int:
     n = round_b_pedagogisk(wb)
     print(f"   {n} celler patchade")
 
-    print(f"\n4. Sparar → {out.name}")
+    print("4. Round C: Indata-fält renamning (branschterminologi)")
+    n = round_c_indata_rename(wb)
+    print(f"   {n} celler patchade")
+
+    print(f"\n5. Sparar → {out.name}")
     save_iter(wb, out)
 
-    print("\n5. Recalc (Excel COM / LibreOffice)")
+    print("\n6. Recalc (Excel COM / LibreOffice)")
     recalc(out)
 
-    print("\n6. Regressionstest:")
+    print("\n7. Regressionstest:")
     res = check_baseline(out)
     if res["rent"] is not None:
         print(f"   Hyra={res['rent']:,.2f}  IRR={res['irr']:.4%}  margin={res['margin']*100:+.2f} pp")
