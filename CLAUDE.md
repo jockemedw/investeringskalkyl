@@ -1,0 +1,68 @@
+# CLAUDE.md — Investeringskalkyl Lejonfastigheter
+
+Ersättare för LM 371 Investeringskalkyl. Ren xlsx (inga makron), 8 flikar, 20-årig kalkyl.
+Beställare: Lejonfastigheter AB (kommunalt fastighetsbolag, Linköping).
+
+## Aktuell baseline (iter 8)
+
+| Mätvärde | Värde | Cell |
+|----------|-------|------|
+| Bindande kravhyra | 11 631 221,72 kr/år | `Resultat!D14` |
+| Faktisk IRR EK | 7,6452 % | `Lönsamhetskontroll!C45` |
+| Marginal mot IRR-krav (6,3 %) | +1,35 pp | — |
+
+Testfall: Skola (Nyb) 5 000 kvm × 40 000 kr/kvm = 200 Mkr.
+
+## Arbetsflöde
+
+```bash
+# Verifiera baseline mot iter8 cached values:
+python tests/regression.py
+
+# Bygga aktuell iter (modulärt — en funktion per §10-uppgift):
+python build/iter9.py
+python tests/regression.py build/iter9.xlsx
+```
+
+För ny §10-uppgift: lägg till `round_X_*(wb)` i [build/iter9.py](build/iter9.py), anropa från `main()`. Köra → verifiera → committa.
+
+## Kärnkonventioner
+
+- **Kirurgisk redigering** av befintlig xlsx via openpyxl-patches — bygg INTE från grunden (D-02, TECH §7)
+- **Kassaflöde stannar vid driftnetto** (D-05) — räntor/avskrivningar tillhör Finansiering-fliken
+- **LM 371 är auktoritativ referens** (D-14) — avvik bara med dokumenterat skäl
+- **Regression validerar varje iter** (D-15) — siffrorna måste reproducera, inte subjektiv bedömning
+- **Cached values nollas av openpyxl-spara** — `recalc()` (Excel COM eller LibreOffice) krävs innan regression
+
+## Arbetsstil med Joakim
+
+- **Svenska, koncist** — hellre kort än långt
+- **Plan först, exekvering sen** — föreslå explicit plan, han godkänner i batch
+- **Tekniska sub-beslut är Claudes** — flagga bara där Joakim faktiskt behöver välja
+- **Direkt pushback vid fel** — rätta utan utdragna ursäkter
+- "Vi gör som LM 371" är giltigt argument utan vidare diskussion
+
+## Filer
+
+- `Investeringskalkyl_iter8.xlsx` — baseline (auktoritativ — ändra inte direkt)
+- `tools/patches.py` — load/save/diff/rename/replace-utilities
+- `tools/recalc.py` — Excel COM via PowerShell eller LibreOffice headless
+- `tests/regression.py` — verifierar 11 631 222 / 7,65 % / +1,35 pp
+- `build/iter9.py` — pågående iter, en funktion per §10-uppgift
+- `build/demo_roundtrip.py` — sanity check för pipelinen
+- `HANDOFF.md` — projektkontext, fashistorik, arkitektur
+- `DECISIONS.md` — designval D-01 → D-19 (D-XX OMPRÖVAR D-YY när ersatts)
+- `TECH_NOTES.md` — openpyxl-mönster, default-värden för iter 8
+- `OPEN_QUESTIONS.md` — frågor som behöver Joakim-input
+
+## §10 — öppna uppgifter
+
+Status (senaste rad = överst):
+
+- [x] Round E: "År N" → "år 20" (commit c423d5e)
+- [x] Round B: pedagogisk omskrivning Beräkningslogik (commit dab830b)
+- [ ] Indata-fält renamning (Avskrivningstakt, räntenivå)
+- [ ] Designcleanup Lönsamhetskontroll (round F)
+- [ ] Full design review
+
+Joakim väljer ordning. Inga uppgifter blockerar varandra.
