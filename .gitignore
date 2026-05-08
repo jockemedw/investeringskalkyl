@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+
+# Build-output (genereras av demo_roundtrip / framtida iter-script)
+build/iter*.xlsx
+
+# Excel-låsfiler
+~$*.xlsx
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Claude lokal config (innehåller per-användare permissions)
+.claude/settings.local.json
