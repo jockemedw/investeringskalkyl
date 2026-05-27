@@ -25,7 +25,12 @@ from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 from tools.patches import load_iter, save_iter, patch_summary_below, ITER8
 from tools.recalc import recalc
-from tools.styling import style_oversikt, style_indata, style_resultat, section_header
+from tools.styling import (
+    style_oversikt, style_indata, style_resultat, section_header,
+    accent_value, PRIMARY, ACCENT_BG, LIGHT, RULE_CLR, MUTED, FONT_FAM, FONT_FAM_BOLD,
+    NAVY_TEXT, SECONDARY, POSITIVE,
+)
+from openpyxl.styles import Font, Alignment, Border, Side
 from tests.regression import check_baseline
 
 NO_FILL = PatternFill(fill_type=None)
@@ -285,6 +290,144 @@ def round_g_oversikt_redesign(wb: Workbook) -> int:
     return 1
 
 
+def round_o_global_theme(wb: Workbook) -> int:
+    """Round O: Globalt LF-tema över alla flikar.
+
+    - Stäng av gridlines (showGridLines=False) — bort med 'Excel-känslan'
+    - Stäng av rubrikrader (showRowColHeaders=False) på publika flikar
+    - Sätt default tab-color till LF-petrol så fliklisten matchar temat
+    """
+    publika = ["Översikt", "Indata", "Kassaflöde", "Finansiering",
+               "Resultat", "Lönsamhetskontroll", "Dokumentation"]
+    intern = ["Beräkningslogik"]  # tekniska beräkningar — behåll headers för felsökning
+    n = 0
+    for sheet in publika + intern:
+        if sheet not in wb.sheetnames:
+            continue
+        ws = wb[sheet]
+        ws.sheet_view.showGridLines = False
+        if sheet in publika:
+            ws.sheet_view.showRowColHeaders = False
+        ws.sheet_properties.tabColor = PRIMARY
+        n += 1
+    return n
+
+
+def round_p_zebra_oversikt(wb: Workbook) -> int:
+    """Round P: Subtil zebra-bg + bottom-rules på Översikt + Resultat.
+
+    Ger struktur utan border-rutnät. Datarader får mjuk LIGHT-bakgrund;
+    sektionsavslut får tunn DEE2E6-linje.
+    """
+    n = 0
+
+    # Översikt — zebra på datablocks i kolumn B:F
+    ws = wb["Översikt"]
+    from openpyxl.styles import PatternFill as PF
+    light_fill = PF("solid", fgColor=LIGHT)
+    rule_side = Side(style="thin", color=RULE_CLR)
+    bottom_rule = Border(bottom=rule_side)
+
+    # Block-definitioner: (start_row, end_row, last_col)
+    blocks = [
+        (6, 7, "F"),    # PROJEKTINFORMATION
+        (10, 12, "F"),  # KALKYLANTAGANDEN
+        (15, 17, "F"),  # BINDANDE KRAVHYRA
+        (20, 22, "F"),  # HYRESSPANN
+        (25, 28, "F"),  # LÖNSAMHETSKRAV
+    ]
+    for start, end, last in blocks:
+        # zebra varannan rad i blocket
+        for i, r in enumerate(range(start, end + 1)):
+            if i % 2 == 1:  # varannan rad
+                for col in "BCDEF":
+                    cell = ws[f"{col}{r}"]
+                    if cell.fill.fill_type is None:
+                        cell.fill = light_fill
+                        n += 1
+        # bottom-rule på sista raden
+        for col in "BCDEF":
+            ws[f"{col}{end}"].border = bottom_rule
+            n += 1
+
+    # Resultat — bottom-rule på sista raden i Kravhyra-tabellen
+    ws = wb["Resultat"]
+    for col in "BCDE":
+        cell = ws[f"{col}14"]
+        cell.border = bottom_rule
+        n += 1
+
+    return n
+
+
+def round_q_hero_block(wb: Workbook) -> int:
+    """Round Q: Hero-block — den bindande kravhyran får en senapsgul fokusbox.
+
+    Översikt: C15 (Årshyra mål) → accent_value (stor, gul bg)
+    Resultat: C14:E14 (kravhyrespannet) → också accent
+    """
+    n = 0
+
+    # Översikt — bindande kravhyra som hero
+    ws = wb["Översikt"]
+    accent_value(ws["C15"])
+    ws.row_dimensions[15].height = 28
+    n += 1
+
+    # Faktisk IRR EK som mini-hero
+    accent_value(ws["C28"])
+    # Behåll FMT_PCT2
+    ws["C28"].number_format = "0.00%"
+    n += 1
+
+    # Resultat — bindande kravhyra
+    ws = wb["Resultat"]
+    if ws["D14"].value is not None:
+        accent_value(ws["D14"])
+        ws.row_dimensions[14].height = 28
+        n += 1
+
+    return n
+
+
+def round_r_status_pills(wb: Workbook) -> int:
+    """Round R: Status-pillar med rundade kanter via fyllning + tunn border."""
+    from openpyxl.styles import PatternFill as PF
+    pos_fill = PF("solid", fgColor="E0F2EE")
+    side = Side(style="thin", color=POSITIVE)
+    pill_border = Border(left=side, right=side, top=side, bottom=side)
+
+    n = 0
+    # Översikt rad 25-27 col E
+    ws = wb["Översikt"]
+    for r in [25, 26, 27]:
+        c = ws[f"E{r}"]
+        if c.value:
+            c.font = Font(name=FONT_FAM_BOLD, bold=True, size=10, color=POSITIVE)
+            c.fill = pos_fill
+            c.border = pill_border
+            c.alignment = Alignment(horizontal="center", vertical="center")
+            n += 1
+    return n
+
+
+def round_s_footer(wb: Workbook) -> int:
+    """Round S: Sidfot 'Lejonfastigheter · Investeringskalkyl v9 · 2026' på varje flik."""
+    n = 0
+    footer_text = "Lejonfastigheter · Investeringskalkyl v9 · 2026"
+    footer_font = Font(name=FONT_FAM, size=8, color=MUTED, italic=True)
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        ws.oddFooter.left.text = footer_text
+        ws.oddFooter.left.size = 8
+        ws.oddFooter.left.color = MUTED
+        ws.oddFooter.right.text = "Sida &P / &N"
+        ws.oddFooter.right.size = 8
+        ws.oddFooter.right.color = MUTED
+        n += 1
+    return n
+
+
 def round_i_page_setup(wb: Workbook) -> int:
     """Round I: Print area och page setup per flik.
 
@@ -509,6 +652,26 @@ def main() -> int:
     print("8e. Round M: Dokumentation header-konsistens")
     n = round_m_dokumentation(wb)
     print(f"    {n} sektioner stylade")
+
+    print("8f. Round O: globalt LF-tema (gridlines av, fliktag färgad)")
+    n = round_o_global_theme(wb)
+    print(f"    {n} flikar uppdaterade")
+
+    print("8g. Round P: zebra & bottom-rules")
+    n = round_p_zebra_oversikt(wb)
+    print(f"    {n} celler stylade")
+
+    print("8h. Round Q: hero-block för nyckelresultat (gul accent)")
+    n = round_q_hero_block(wb)
+    print(f"    {n} hero-celler")
+
+    print("8i. Round R: status-pillar")
+    n = round_r_status_pills(wb)
+    print(f"    {n} pillar")
+
+    print("8j. Round S: sidfot")
+    n = round_s_footer(wb)
+    print(f"    {n} flikar")
 
     print(f"\n9. Sparar → {out.name}")
     save_iter(wb, out)

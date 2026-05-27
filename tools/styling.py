@@ -1,32 +1,49 @@
-"""Design system för Investeringskalkyl — finansmodell-standarder (XLSX-skill).
+"""Design system för Investeringskalkyl — Lejonfastigheter Premium-tema.
 
-Färgkodning (branschstandard):
-  BLÅ  text (0,0,255)   — hårdkodade indata, "Fyll i"-celler
-  SVART text (0,0,0)    — formler och beräkningar
-  GRÖN  text (0,128,0)  — cross-sheet-referenser
+Palett extraherad från lejonfastigheter.se:
+  PRIMARY    #10313E — mörk petrol (banners, sektion-headers)
+  SECONDARY  #00657D — turkos (sub-headers, accentband)
+  ACCENT     #FAB600 — senapsgul (nyckelresultat: kravhyra, IRR)
+  POSITIVE   #00937C — mörkgrön (✓ Uppfyllt)
+  NEUTRAL    #F4F6F8 — ljusgrå (zebra, datablock-bg)
+  RULE       #DEE2E6 — subtila avgränsare
+  TEXT_PRIM  #212529 — brödtext
+  TEXT_MUTED #6C757D — etiketter, hjälptext
 
-Rubrikpalett:
-  PRIMARY  #1B3A6B — sektion-rubriker (mörkblå)
-  SECONDARY #EBF0F8 — data-bakgrund (ljusblå)
-  INPUT_BG  #EFF6FF — redigerbara fält
-  STATUS_OK #E8F5E9 — ✓ Uppfyllt
+Typografi: Segoe UI genomgående (Windows-default, humanistisk sans).
+
+Finansmodell-textkodning behålls:
+  BLÅ  text — hårdkodade indata
+  SVART text — formler
+  GRÖN text — cross-sheet-referenser
 """
 from __future__ import annotations
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.worksheet.worksheet import Worksheet
 
-# ── Palett ─────────────────────────────────────────────────────────────────
-PRIMARY   = "1B3A6B"   # mörkblå — sektion-rubriker
+# ── LF-palett ──────────────────────────────────────────────────────────────
+PRIMARY   = "10313E"   # mörk petrol — banners
+SECONDARY = "00657D"   # turkos — sub-headers
+ACCENT    = "FAB600"   # senapsgul — nyckelresultat
+ACCENT_BG = "FFF6D9"   # mjuk gul bg för accentruta
+POSITIVE  = "00937C"   # mörkgrön — ✓
+POSITIVE_BG = "E0F2EE" # mjuk grön
 WHITE     = "FFFFFF"
-LIGHT     = "EBF0F8"   # ljusblå — data-bakgrund
-INPUT_BG  = "EFF6FF"   # blåvit  — Fyll i-celler
-STATUS_BG = "E8F5E9"   # ljusgrön — ✓-celler
-RULE_CLR  = "C5D3E8"   # kantstreckets färg
+LIGHT     = "F4F6F8"   # neutral ljusgrå
+INPUT_BG  = "EAF3F6"   # mjuk turkos-vit för input-fält
+STATUS_BG = "E0F2EE"   # ljusgrön — ✓-celler
+RULE_CLR  = "DEE2E6"   # subtil rule
+NAVY_TEXT = "10313E"   # rubrik-text mot ljus bg
 
 # ── Textfärger (finansmodell-standard) ────────────────────────────────────
-BLUE  = "0000FF"   # hårdkodad indata
-GREEN = "008000"   # cross-sheet-referens
-BLACK = "000000"   # formel / beräkning
+BLUE  = "0B5F7A"   # mörk petrol-blå istället för #0000FF (mer harmoniskt)
+GREEN = "00937C"   # cross-sheet — LF-grön
+BLACK = "212529"   # brödtext
+MUTED = "6C757D"   # sekundärtext
+
+# ── Typografi ──────────────────────────────────────────────────────────────
+FONT_FAM  = "Segoe UI"
+FONT_FAM_BOLD = "Segoe UI Semibold"
 
 # ── Talformat ──────────────────────────────────────────────────────────────
 FMT_KR     = '#,##0 "kr";-#,##0 "kr";"-"'
@@ -47,8 +64,9 @@ def _border_bottom(color: str = RULE_CLR) -> Border:
     side = Side(style="thin", color=color)
     return Border(bottom=side)
 
-def _font(bold=False, size=11, color=BLACK, italic=False) -> Font:
-    return Font(name="Calibri", bold=bold, size=size, color=color, italic=italic)
+def _font(bold=False, size=10, color=BLACK, italic=False) -> Font:
+    name = FONT_FAM_BOLD if bold else FONT_FAM
+    return Font(name=name, bold=bold, size=size, color=color, italic=italic)
 
 def _align(h="left", v="center", wrap=False) -> Alignment:
     return Alignment(horizontal=h, vertical=v, wrap_text=wrap)
@@ -57,76 +75,81 @@ def _align(h="left", v="center", wrap=False) -> Alignment:
 # ── Stilapplikatorer ───────────────────────────────────────────────────────
 
 def section_header(cell, level: int = 1) -> None:
-    """Sektion-rubrik: mörkblå bakgrund, vit bold text."""
+    """Sektion-rubrik: LF-petrol bg, vit semibold text."""
     if level == 1:
-        cell.font = _font(bold=True, size=10, color=WHITE)
+        cell.font = _font(bold=True, size=11, color=WHITE)
         cell.fill = _fill(PRIMARY)
     else:
-        cell.font = _font(bold=True, size=10, color=PRIMARY)
+        cell.font = _font(bold=True, size=10, color=SECONDARY)
         cell.fill = _fill(LIGHT)
-    cell.alignment = _align(h="left", v="center")
+    cell.alignment = _align(h="left", v="center", wrap=False)
+    cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
 
 def title_style(cell) -> None:
-    cell.font = _font(bold=True, size=14, color=PRIMARY)
+    cell.font = Font(name=FONT_FAM_BOLD, bold=True, size=16, color=NAVY_TEXT)
     cell.alignment = _align(h="left", v="center")
 
 def subtitle_style(cell) -> None:
-    cell.font = _font(bold=False, size=11, color="4A5568", italic=True)
+    cell.font = _font(bold=False, size=11, color=MUTED, italic=True)
     cell.alignment = _align(h="left", v="center")
 
 def label_style(cell) -> None:
-    cell.font = _font(bold=False, size=10, color="2D3748")
+    cell.font = _font(bold=False, size=10, color=BLACK)
     cell.alignment = _align(h="left", v="center")
 
 def input_style(cell) -> None:
-    """Blå text + ljusblå bakgrund — användarens fält."""
+    """Petrol text + mjuk turkos-vit bg — användarens fält."""
     cell.font = _font(bold=False, size=10, color=BLUE)
     cell.fill = _fill(INPUT_BG)
     cell.alignment = _align(h="left", v="center")
 
 def formula_style(cell) -> None:
-    """Svart text — formel/beräkning."""
     cell.font = _font(bold=False, size=10, color=BLACK)
     cell.alignment = _align(h="right", v="center")
 
 def crossref_style(cell) -> None:
-    """Grön text — cross-sheet-referens."""
-    cell.font = _font(bold=False, size=10, color=GREEN)
+    cell.font = _font(bold=False, size=10, color=SECONDARY)
     cell.alignment = _align(h="right", v="center")
 
 def crossref_bold(cell) -> None:
-    cell.font = _font(bold=True, size=11, color=GREEN)
+    cell.font = _font(bold=True, size=11, color=NAVY_TEXT)
+    cell.alignment = _align(h="right", v="center")
+
+def accent_value(cell) -> None:
+    """Senapsgul box för nyckelresultat (bindande kravhyra, IRR)."""
+    cell.font = Font(name=FONT_FAM_BOLD, bold=True, size=14, color=NAVY_TEXT)
+    cell.fill = _fill(ACCENT_BG)
     cell.alignment = _align(h="right", v="center")
 
 def status_ok_style(cell) -> None:
-    cell.font = _font(bold=True, size=10, color="1A5E20")
-    cell.fill = _fill(STATUS_BG)
+    cell.font = _font(bold=True, size=10, color=POSITIVE)
+    cell.fill = _fill(POSITIVE_BG)
     cell.alignment = _align(h="center", v="center")
 
 def toc_link_style(cell) -> None:
-    cell.font = Font(name="Calibri", bold=True, size=10,
-                     color=PRIMARY, underline="single")
+    cell.font = Font(name=FONT_FAM_BOLD, bold=True, size=11,
+                     color=SECONDARY, underline="single")
     cell.alignment = _align(h="left", v="center")
 
 def toc_tag_style(cell) -> None:
-    cell.font = _font(bold=False, size=10, color="6B7280", italic=True)
+    cell.font = _font(bold=False, size=10, color=MUTED, italic=True)
     cell.alignment = _align(h="left", v="center")
 
 def toc_desc_style(cell) -> None:
-    cell.font = _font(bold=False, size=9, color="6B7280")
+    cell.font = _font(bold=False, size=9, color=MUTED)
     cell.alignment = _align(h="left", v="center", wrap=True)
 
 
 # ── Oversikt ───────────────────────────────────────────────────────────────
 
 def style_oversikt(ws: Worksheet) -> None:
-    # Kolumnbredder
+    # Kolumnbredder — C bredare för senapsgul accent-värde
     ws.column_dimensions["A"].width = 2
-    ws.column_dimensions["B"].width = 30
-    ws.column_dimensions["C"].width = 18
+    ws.column_dimensions["B"].width = 32
+    ws.column_dimensions["C"].width = 22
     ws.column_dimensions["D"].width = 2
-    ws.column_dimensions["E"].width = 24
-    ws.column_dimensions["F"].width = 16
+    ws.column_dimensions["E"].width = 26
+    ws.column_dimensions["F"].width = 20
 
     # Radhöjder
     ws.row_dimensions[2].height = 28
