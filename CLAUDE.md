@@ -22,9 +22,13 @@ python tests/regression.py
 # Bygga aktuell iter (modulärt — en funktion per §10-uppgift):
 python build/iter9.py
 python tests/regression.py build/iter9.xlsx
+
+# Visuell designgranskning av en .xlsx (Excel COM → PNG → vision-analys):
+# Triggar xlsx-review skill — Claude rapporterar layoutproblem, ändrar ingen kod
+/xlsx-review build/iter9.xlsx
 ```
 
-För ny §10-uppgift: lägg till `round_X_*(wb)` i [build/iter9.py](build/iter9.py), anropa från `main()`. Köra → verifiera → committa.
+För ny §10-uppgift: lägg till `round_X_*(wb)` i [build/iter9.py](build/iter9.py), anropa från `main()`. Köra → verifiera → designgranska → committa.
 
 ## Kärnkonventioner
 

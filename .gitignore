@@ -21,3 +21,9 @@ Thumbs.db
 
 # Claude lokal config (innehåller per-användare permissions)
 .claude/settings.local.json
+
+# xlsx-review skill output (genererade PNGs för designgranskning)
+.xlsx-review/
+
+# Brainstorming-server cache (visual companion)
+.superpowers/
