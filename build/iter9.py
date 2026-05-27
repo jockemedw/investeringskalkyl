@@ -21,10 +21,14 @@ sys.path.insert(0, str(ROOT))
 
 from openpyxl import Workbook
 from openpyxl.worksheet.hyperlink import Hyperlink
+from openpyxl.styles import PatternFill
+from openpyxl.utils import get_column_letter
 from tools.patches import load_iter, save_iter, patch_summary_below, ITER8
 from tools.recalc import recalc
-from tools.styling import style_oversikt, style_indata, style_resultat
+from tools.styling import style_oversikt, style_indata, style_resultat, section_header
 from tests.regression import check_baseline
+
+NO_FILL = PatternFill(fill_type=None)
 
 
 def round_e_year_n(wb: Workbook) -> int:
@@ -281,6 +285,176 @@ def round_g_oversikt_redesign(wb: Workbook) -> int:
     return 1
 
 
+def round_i_page_setup(wb: Workbook) -> int:
+    """Round I: Print area och page setup per flik.
+
+    Drabbade flikar (utan rätt setup blir PDF-export 30% bred):
+    Indata, Beräkningslogik, Dokumentation, Lönsamhetskontroll.
+    Sätter print_area till faktiskt använt range, fit-to-width=1,
+    landscape på breda flikar.
+    """
+    setup = {
+        "Översikt":           ("portrait",  6, None),   # B:F
+        "Indata":             ("landscape", 18, None),  # bred — hyresobjekt
+        "Kassaflöde":         ("landscape", 28, None),  # 25 årskolumner
+        "Finansiering":       ("landscape", 28, None),
+        "Resultat":           ("portrait",  6, None),
+        "Lönsamhetskontroll": ("portrait",  6, None),
+        "Beräkningslogik":    ("landscape", 30, None),  # 25 årskolumner + block
+        "Dokumentation":      ("portrait",  4, None),   # B kolumn räcker
+    }
+    n = 0
+    for sheet, (orient, max_col, _) in setup.items():
+        if sheet not in wb.sheetnames:
+            continue
+        ws = wb[sheet]
+        last_row = ws.max_row
+        last_col = min(max_col, ws.max_column)
+        col_letter = get_column_letter(last_col)
+        ws.print_area = f"A1:{col_letter}{last_row}"
+        ws.page_setup.orientation = orient
+        ws.page_setup.fitToWidth = 1
+        ws.page_setup.fitToHeight = 0
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
+        ws.page_margins.left = 0.4
+        ws.page_margins.right = 0.4
+        ws.page_margins.top = 0.5
+        ws.page_margins.bottom = 0.5
+        n += 1
+    return n
+
+
+def round_j_oversikt_fixes(wb: Workbook) -> int:
+    """Round J: Översikt header-fixes.
+
+    - Merge title B2:F2 så hela 'INVESTERINGSKALKYL — LEJONFASTIGHETER AB' har bg
+    - Merge alla sektion-rubriker B:F så bg-fyllning täcker hela radens bredd
+    - Rensa residual mörkblå fyllning på Kalkylränta/Årshyra-rader (B10, B15)
+    - Höj TOC-radhöjder så wrappad beskrivning inte klipps
+    """
+    from openpyxl.styles import Font, Alignment
+    ws = wb["Översikt"]
+    n = 0
+
+    # Merge title och underrad (subtitle)
+    for merge_range in ["B2:F2", "B3:F3"]:
+        try:
+            ws.merge_cells(merge_range)
+            n += 1
+        except Exception:
+            pass
+
+    # Banner-titel: vit fet text på mörkblå bg (matchar sektion-headers)
+    ws["B2"].fill = PatternFill("solid", fgColor="1B3A6B")
+    ws["B2"].font = Font(name="Calibri", bold=True, size=14, color="FFFFFF")
+    ws["B2"].alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    ws.row_dimensions[2].height = 32
+    # Subtitle på vit bg, mörk text
+    ws["B3"].fill = NO_FILL
+    ws["B3"].font = Font(name="Calibri", bold=False, size=11, color="4A5568", italic=True)
+    ws["B3"].alignment = Alignment(horizontal="left", vertical="center", indent=1)
+
+    # Merge alla sektion-headers (full bredd B:F)
+    section_rows = [5, 9, 14, 19, 24, 30]
+    for r in section_rows:
+        try:
+            ws.merge_cells(f"B{r}:F{r}")
+            n += 1
+        except Exception:
+            pass
+
+    # Rensa residual iter8-fyllning på dataceller som av misstag fått mörk bg
+    for coord in ["B10", "C10", "B15", "C15"]:
+        ws[coord].fill = NO_FILL
+        n += 1
+
+    # TOC-rader: höj höjd så wrap-text inte klipps
+    for r in [32, 34, 36, 38, 40, 42, 44]:
+        ws.row_dimensions[r].height = 32
+        n += 1
+
+    return n
+
+
+def round_k_format_konsistens(wb: Workbook) -> int:
+    """Round K: Talformat — parenteser → minustecken för negativa tal.
+
+    iter8 använde '(#,##0)' för negativa belopp; svensk konvention är
+    minustecken. Walkar alla celler i Kassaflöde + Finansiering och
+    byter format.
+    """
+    sheets = ["Kassaflöde", "Finansiering", "Beräkningslogik", "Lönsamhetskontroll"]
+    n = 0
+    for sheet in sheets:
+        if sheet not in wb.sheetnames:
+            continue
+        ws = wb[sheet]
+        for row in ws.iter_rows():
+            for cell in row:
+                fmt = cell.number_format
+                if fmt and "(" in fmt and ")" in fmt:
+                    new_fmt = fmt.replace("\\(", "-").replace("\\)", "")
+                    new_fmt = new_fmt.replace("(", "-").replace(")", "")
+                    if new_fmt != fmt:
+                        cell.number_format = new_fmt
+                        n += 1
+    return n
+
+
+def round_l_lonsamhetskontroll_headers(wb: Workbook) -> int:
+    """Round L: Synka sektion-headers på Lönsamhetskontroll till samma bredd.
+
+    iter8 hade headers på olika spann (B:E vs B:G). Merge alla till B:G.
+    """
+    ws = wb["Lönsamhetskontroll"]
+    header_rows = [4, 12, 21, 42, 50]
+
+    # Unmerga eventuella befintliga merges på dessa rader först
+    existing = list(ws.merged_cells.ranges)
+    for mr in existing:
+        if mr.min_row in header_rows and mr.min_row == mr.max_row:
+            ws.unmerge_cells(str(mr))
+
+    n = 0
+    for r in header_rows:
+        try:
+            ws.merge_cells(f"B{r}:G{r}")
+            n += 1
+        except Exception:
+            pass
+
+    # Centrera texten i headers
+    for r in header_rows:
+        ws[f"B{r}"].alignment = ws[f"B{r}"].alignment.copy(horizontal="center")
+
+    return n
+
+
+def round_m_dokumentation(wb: Workbook) -> int:
+    """Round M: Konsekvent sektion-header-stil på Dokumentation.
+
+    Identifierar numrerade huvudsektioner ('1. Syfte', '2. Grundprincip' …)
+    och applicerar enhetlig stil (mörkblå bg, vit fet text).
+    """
+    ws = wb["Dokumentation"]
+    import re
+    main_section_re = re.compile(r"^\d+\.\s+\S")
+
+    n = 0
+    for row in ws.iter_rows(min_col=2, max_col=2):
+        cell = row[0]
+        if isinstance(cell.value, str) and main_section_re.match(cell.value):
+            section_header(cell, level=1)
+            try:
+                ws.merge_cells(f"B{cell.row}:E{cell.row}")
+            except Exception:
+                pass
+            ws.row_dimensions[cell.row].height = 22
+            n += 1
+
+    return n
+
+
 def main() -> int:
     out = ROOT / "build" / "iter9.xlsx"
     out.parent.mkdir(exist_ok=True)
@@ -313,6 +487,26 @@ def main() -> int:
     style_indata(wb["Indata"])
     style_resultat(wb["Resultat"])
     print("   styling klar")
+
+    print("8a. Round I: print area & page setup")
+    n = round_i_page_setup(wb)
+    print(f"    {n} flikar konfigurerade")
+
+    print("8b. Round J: Översikt header-fixes")
+    n = round_j_oversikt_fixes(wb)
+    print(f"    {n} ändringar")
+
+    print("8c. Round K: talformat-konsistens (parens → minus)")
+    n = round_k_format_konsistens(wb)
+    print(f"    {n} celler reformaterade")
+
+    print("8d. Round L: Lönsamhetskontroll header-bredd")
+    n = round_l_lonsamhetskontroll_headers(wb)
+    print(f"    {n} headers mergade")
+
+    print("8e. Round M: Dokumentation header-konsistens")
+    n = round_m_dokumentation(wb)
+    print(f"    {n} sektioner stylade")
 
     print(f"\n9. Sparar → {out.name}")
     save_iter(wb, out)
