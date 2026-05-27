@@ -293,18 +293,20 @@ def round_i_page_setup(wb: Workbook) -> int:
     Sätter print_area till faktiskt använt range, fit-to-width=1,
     landscape på breda flikar.
     """
+    # (orientation, max_col, fit_to_width)
+    # fit_to_width=2 → tillåt 2 sidor i bredd för 25-årsflikar (annars oläsligt)
     setup = {
-        "Översikt":           ("portrait",  6, None),   # B:F
-        "Indata":             ("landscape", 18, None),  # bred — hyresobjekt
-        "Kassaflöde":         ("landscape", 28, None),  # 25 årskolumner
-        "Finansiering":       ("landscape", 28, None),
-        "Resultat":           ("portrait",  6, None),
-        "Lönsamhetskontroll": ("portrait",  6, None),
-        "Beräkningslogik":    ("landscape", 30, None),  # 25 årskolumner + block
-        "Dokumentation":      ("portrait",  4, None),   # B kolumn räcker
+        "Översikt":           ("portrait",  6,  1),
+        "Indata":             ("landscape", 18, 1),
+        "Kassaflöde":         ("landscape", 28, 2),  # 25 årskolumner → 2 sidor
+        "Finansiering":       ("landscape", 28, 2),
+        "Resultat":           ("portrait",  6,  1),
+        "Lönsamhetskontroll": ("portrait",  6,  1),
+        "Beräkningslogik":    ("landscape", 30, 2),  # 25 årskolumner + block → 2 sidor
+        "Dokumentation":      ("portrait",  4,  1),
     }
     n = 0
-    for sheet, (orient, max_col, _) in setup.items():
+    for sheet, (orient, max_col, fit_width) in setup.items():
         if sheet not in wb.sheetnames:
             continue
         ws = wb[sheet]
@@ -313,7 +315,7 @@ def round_i_page_setup(wb: Workbook) -> int:
         col_letter = get_column_letter(last_col)
         ws.print_area = f"A1:{col_letter}{last_row}"
         ws.page_setup.orientation = orient
-        ws.page_setup.fitToWidth = 1
+        ws.page_setup.fitToWidth = fit_width
         ws.page_setup.fitToHeight = 0
         ws.sheet_properties.pageSetUpPr.fitToPage = True
         ws.page_margins.left = 0.4
