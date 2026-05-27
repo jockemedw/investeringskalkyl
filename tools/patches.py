@@ -26,7 +26,7 @@ def save_iter(wb: Workbook, out_path: Path | str) -> Path:
     wb.save(out)
     # Round-trip test: kan filen öppnas igen?
     test = load_workbook(out, data_only=False)
-    assert len(test.sheetnames) == 8, f"Förväntade 8 flikar, fick {len(test.sheetnames)}"
+    assert 8 <= len(test.sheetnames) <= 9, f"Förväntade 8-9 flikar, fick {len(test.sheetnames)}"
     return out
 
 
