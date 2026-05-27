@@ -1,149 +1,42 @@
-"""Design system för Investeringskalkyl — Lejonfastigheter Premium-tema.
+"""Legacy-fasad mot tools.theme — alla stilar går via theme.apply(cell, role).
 
-Palett extraherad från lejonfastigheter.se:
-  PRIMARY    #10313E — mörk petrol (banners, sektion-headers)
-  SECONDARY  #00657D — turkos (sub-headers, accentband)
-  ACCENT     #FAB600 — senapsgul (nyckelresultat: kravhyra, IRR)
-  POSITIVE   #00937C — mörkgrön (✓ Uppfyllt)
-  NEUTRAL    #F4F6F8 — ljusgrå (zebra, datablock-bg)
-  RULE       #DEE2E6 — subtila avgränsare
-  TEXT_PRIM  #212529 — brödtext
-  TEXT_MUTED #6C757D — etiketter, hjälptext
-
-Typografi: Segoe UI genomgående (Windows-default, humanistisk sans).
-
-Finansmodell-textkodning behålls:
-  BLÅ  text — hårdkodade indata
-  SVART text — formler
-  GRÖN text — cross-sheet-referenser
+styling.py existerar bara för bakåtkompatibilitet med tidigare rounds.
+Inga nya stilar — använd theme.apply() direkt.
 """
 from __future__ import annotations
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.worksheet.worksheet import Worksheet
+from openpyxl.styles import Font, PatternFill, Alignment
+from tools.theme import (
+    apply, bottom_rule, clear_format,
+    INK, MUTED, PAPER, SURFACE, ACCENT, POSITIVE, RULE, POSITIVE_TINT,
+    FAMILY, SIZE_D, SIZE_H, SIZE_B, SIZE_C,
+    FMT_KR, FMT_KR_AR, FMT_KR_KVM, FMT_INT, FMT_PCT1, FMT_PCT2, FMT_AR, FMT_M2,
+    ROW_BANNER, ROW_SECTION, ROW_DATA, ROW_HERO, ROW_GAP,
+)
 
-# ── LF-palett ──────────────────────────────────────────────────────────────
-PRIMARY   = "10313E"   # mörk petrol — banners
-SECONDARY = "00657D"   # turkos — sub-headers
-ACCENT    = "FAB600"   # senapsgul — nyckelresultat
-ACCENT_BG = "FFF6D9"   # mjuk gul bg för accentruta
-POSITIVE  = "00937C"   # mörkgrön — ✓
-POSITIVE_BG = "E0F2EE" # mjuk grön
-WHITE     = "FFFFFF"
-LIGHT     = "F4F6F8"   # neutral ljusgrå
-INPUT_BG  = "EAF3F6"   # mjuk turkos-vit för input-fält
-STATUS_BG = "E0F2EE"   # ljusgrön — ✓-celler
-RULE_CLR  = "DEE2E6"   # subtil rule
-NAVY_TEXT = "10313E"   # rubrik-text mot ljus bg
-
-# ── Textfärger (finansmodell-standard) ────────────────────────────────────
-BLUE  = "0B5F7A"   # mörk petrol-blå istället för #0000FF (mer harmoniskt)
-GREEN = "00937C"   # cross-sheet — LF-grön
-BLACK = "212529"   # brödtext
-MUTED = "6C757D"   # sekundärtext
-
-# ── Typografi ──────────────────────────────────────────────────────────────
-FONT_FAM  = "Segoe UI"
-FONT_FAM_BOLD = "Segoe UI Semibold"
-
-# ── Talformat ──────────────────────────────────────────────────────────────
-FMT_KR     = '#,##0 "kr";-#,##0 "kr";"-"'
-FMT_KR_AR  = '#,##0 "kr/år";-#,##0 "kr/år";"-"'
-FMT_KR_KVM = '#,##0 "kr/kvm";-#,##0 "kr/kvm";"-"'
-FMT_PCT    = "0.0%"
-FMT_PCT2   = "0.00%"
-FMT_INT    = "#,##0"
-FMT_AR     = '0 "år"'
+# Exponerade alias för iter9.py (rensar successivt)
+PRIMARY      = INK
+SECONDARY    = INK         # eliminerad — peka till INK
+NAVY_TEXT    = INK
+WHITE        = PAPER
+LIGHT        = SURFACE
+INPUT_BG     = SURFACE
+STATUS_BG    = POSITIVE_TINT
+ACCENT_BG    = ACCENT
+POSITIVE_BG  = POSITIVE_TINT
+RULE_CLR     = RULE
+BLUE         = INK
+GREEN        = POSITIVE
+BLACK        = INK
+FONT_FAM     = FAMILY
+FONT_FAM_BOLD = FAMILY      # samma family, bold via Font(bold=True)
 
 
-# ── Hjälpfunktioner ────────────────────────────────────────────────────────
-
-def _fill(hex_color: str) -> PatternFill:
-    return PatternFill("solid", fgColor=hex_color)
-
-def _border_bottom(color: str = RULE_CLR) -> Border:
-    side = Side(style="thin", color=color)
-    return Border(bottom=side)
-
-def _font(bold=False, size=10, color=BLACK, italic=False) -> Font:
-    name = FONT_FAM_BOLD if bold else FONT_FAM
-    return Font(name=name, bold=bold, size=size, color=color, italic=italic)
-
-def _align(h="left", v="center", wrap=False) -> Alignment:
-    return Alignment(horizontal=h, vertical=v, wrap_text=wrap)
-
-
-# ── Stilapplikatorer ───────────────────────────────────────────────────────
-
-def section_header(cell, level: int = 1) -> None:
-    """Sektion-rubrik: LF-petrol bg, vit semibold text."""
-    if level == 1:
-        cell.font = _font(bold=True, size=11, color=WHITE)
-        cell.fill = _fill(PRIMARY)
-    else:
-        cell.font = _font(bold=True, size=10, color=SECONDARY)
-        cell.fill = _fill(LIGHT)
-    cell.alignment = _align(h="left", v="center", wrap=False)
-    cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-
-def title_style(cell) -> None:
-    cell.font = Font(name=FONT_FAM_BOLD, bold=True, size=16, color=NAVY_TEXT)
-    cell.alignment = _align(h="left", v="center")
-
-def subtitle_style(cell) -> None:
-    cell.font = _font(bold=False, size=11, color=MUTED, italic=True)
-    cell.alignment = _align(h="left", v="center")
-
-def label_style(cell) -> None:
-    cell.font = _font(bold=False, size=10, color=BLACK)
-    cell.alignment = _align(h="left", v="center")
-
-def input_style(cell) -> None:
-    """Petrol text + mjuk turkos-vit bg — användarens fält."""
-    cell.font = _font(bold=False, size=10, color=BLUE)
-    cell.fill = _fill(INPUT_BG)
-    cell.alignment = _align(h="left", v="center")
-
-def formula_style(cell) -> None:
-    cell.font = _font(bold=False, size=10, color=BLACK)
-    cell.alignment = _align(h="right", v="center")
-
-def crossref_style(cell) -> None:
-    cell.font = _font(bold=False, size=10, color=SECONDARY)
-    cell.alignment = _align(h="right", v="center")
-
-def crossref_bold(cell) -> None:
-    cell.font = _font(bold=True, size=11, color=NAVY_TEXT)
-    cell.alignment = _align(h="right", v="center")
-
-def accent_value(cell) -> None:
-    """Senapsgul box för nyckelresultat (bindande kravhyra, IRR)."""
-    cell.font = Font(name=FONT_FAM_BOLD, bold=True, size=14, color=NAVY_TEXT)
-    cell.fill = _fill(ACCENT_BG)
-    cell.alignment = _align(h="right", v="center")
-
-def status_ok_style(cell) -> None:
-    cell.font = _font(bold=True, size=10, color=POSITIVE)
-    cell.fill = _fill(POSITIVE_BG)
-    cell.alignment = _align(h="center", v="center")
-
-def toc_link_style(cell) -> None:
-    cell.font = Font(name=FONT_FAM_BOLD, bold=True, size=11,
-                     color=SECONDARY, underline="single")
-    cell.alignment = _align(h="left", v="center")
-
-def toc_tag_style(cell) -> None:
-    cell.font = _font(bold=False, size=10, color=MUTED, italic=True)
-    cell.alignment = _align(h="left", v="center")
-
-def toc_desc_style(cell) -> None:
-    cell.font = _font(bold=False, size=9, color=MUTED)
-    cell.alignment = _align(h="left", v="center", wrap=True)
-
-
-# ── Oversikt ───────────────────────────────────────────────────────────────
+# ── Style-applikatorer per flik ────────────────────────────────────────────
 
 def style_oversikt(ws: Worksheet) -> None:
-    # Kolumnbredder — C bredare för senapsgul accent-värde
+    """Översikt — banner + 6 sektioner + TOC. All styling via apply()."""
+    # Kolumnbredder
     ws.column_dimensions["A"].width = 2
     ws.column_dimensions["B"].width = 32
     ws.column_dimensions["C"].width = 22
@@ -151,121 +44,154 @@ def style_oversikt(ws: Worksheet) -> None:
     ws.column_dimensions["E"].width = 26
     ws.column_dimensions["F"].width = 20
 
-    # Radhöjder
-    ws.row_dimensions[2].height = 28
-    ws.row_dimensions[3].height = 16
+    # Banner
+    apply(ws["B2"], "title")
+    ws.row_dimensions[2].height = ROW_BANNER
+    apply(ws["B3"], "caption")
+    ws.row_dimensions[3].height = ROW_GAP + 4
+
+    # Sektion-headers
     for r in [5, 9, 14, 19, 24, 30]:
-        ws.row_dimensions[r].height = 20
-    for r in [6, 7, 10, 11, 12, 15, 16, 17, 20, 21, 22, 25, 26, 27, 28]:
-        ws.row_dimensions[r].height = 18
+        apply(ws[f"B{r}"], "section")
+        ws.row_dimensions[r].height = ROW_SECTION
 
-    # Titel
-    title_style(ws["B2"])
-    subtitle_style(ws["B3"])
+    # Datarader: B=label, C/F=value, E=label (höger block)
+    data_rows = {
+        "block_a": [6, 7],                # PROJEKTINFORMATION
+        "block_b": [10, 11, 12],          # KALKYLANTAGANDEN
+        "block_c": [15, 16, 17],          # BINDANDE KRAVHYRA
+        "block_d": [20, 21, 22],          # HYRESSPANN
+        "block_e": [25, 26, 27, 28],      # LÖNSAMHETSKRAV
+    }
+    for rows in data_rows.values():
+        for r in rows:
+            apply(ws[f"B{r}"], "label")
+            apply(ws[f"C{r}"], "value")
+            apply(ws[f"E{r}"], "label")
+            apply(ws[f"F{r}"], "value")
+            ws.row_dimensions[r].height = ROW_DATA
 
-    # A. PROJEKTINFORMATION
-    section_header(ws["B5"])
-    for r in [6, 7]:
-        label_style(ws[f"B{r}"])
-        crossref_style(ws[f"C{r}"])
-        label_style(ws[f"E{r}"])
-    input_style(ws["C6"])   # Fastighet — Fyll i
-    input_style(ws["F6"])   # Utförd av — Fyll i
-    crossref_style(ws["C7"])
-    ws["C7"].number_format = "0"
-    crossref_style(ws["F7"])
-    ws["F7"].number_format = FMT_AR
-
-    # B. KALKYLANTAGANDEN
-    section_header(ws["B9"])
-    for r in [10, 11, 12]:
-        label_style(ws[f"B{r}"])
-        crossref_style(ws[f"C{r}"])
-        ws[f"C{r}"].number_format = FMT_PCT
-    label_style(ws["E10"])
-    label_style(ws["E11"])
-    crossref_style(ws["F10"])
-    crossref_style(ws["F11"])
-    ws["F10"].number_format = FMT_PCT
-    ws["F11"].number_format = FMT_PCT
-
-    # C. BINDANDE KRAVHYRA
-    section_header(ws["B14"])
-    for r in [15, 16, 17]:
-        label_style(ws[f"B{r}"])
-        crossref_bold(ws[f"C{r}"])
-        label_style(ws[f"E{r}"])
-        crossref_style(ws[f"F{r}"])
+    # Talformat på block_b (procent), block_c (kr), block_d (kr / kr), block_e (kr+pct)
+    ws["C10"].number_format = FMT_PCT1; ws["F10"].number_format = FMT_PCT1
+    ws["C11"].number_format = FMT_PCT1; ws["F11"].number_format = FMT_PCT1
+    ws["C12"].number_format = FMT_PCT1
     ws["C15"].number_format = FMT_KR_AR
     ws["C16"].number_format = FMT_KR_KVM
     ws["C17"].number_format = FMT_KR
     ws["F17"].number_format = FMT_KR_KVM
-
-    # D. HYRESSPANN
-    section_header(ws["B19"])
     for r in [20, 21, 22]:
-        label_style(ws[f"B{r}"])
-        crossref_style(ws[f"C{r}"])
-        crossref_style(ws[f"E{r}"])
         ws[f"C{r}"].number_format = FMT_KR_AR
         ws[f"E{r}"].number_format = FMT_KR
-
-    # E. LÖNSAMHETSKRAV
-    section_header(ws["B24"])
     for r in [25, 26, 27]:
-        label_style(ws[f"B{r}"])
-        crossref_style(ws[f"C{r}"])
         ws[f"C{r}"].number_format = FMT_KR
-        status_ok_style(ws[f"E{r}"])
-    ws["C25"].number_format = FMT_KR   # NPV
-    ws["C26"].number_format = FMT_KR   # NPV EK
-    ws["C27"].number_format = FMT_KR   # MV diff
-    label_style(ws["B28"])
-    crossref_bold(ws["C28"])
     ws["C28"].number_format = FMT_PCT2
-    label_style(ws["E28"])
-    crossref_style(ws["F28"])
     ws["F28"].number_format = FMT_PCT2
 
-    # F. INNEHÅLLSFÖRTECKNING
-    section_header(ws["B30"])
+    # Hero — bindande kravhyra
+    apply(ws["B15"], "hero_label")
+    apply(ws["C15"], "hero")
+    ws["C15"].number_format = FMT_KR_AR
+    ws.row_dimensions[15].height = ROW_HERO
+
+    # Status-pillar på 25, 26, 27 (kolumn E)
+    for r in [25, 26, 27]:
+        apply(ws[f"E{r}"], "status")
+
+    # TOC
+    apply(ws["B30"], "section")
     for r in [32, 34, 36, 38, 40, 42, 44]:
-        toc_link_style(ws[f"B{r}"])
-        toc_tag_style(ws[f"C{r}"])
-        toc_desc_style(ws[f"E{r}"])
-        ws.row_dimensions[r].height = 18
+        apply(ws[f"B{r}"], "value")  # länken stylas särskilt nedan
+        ws[f"B{r}"].font = Font(name=FAMILY, size=SIZE_B, bold=True,
+                                color=INK, underline="single")
+        apply(ws[f"C{r}"], "caption")
+        apply(ws[f"E{r}"], "caption")
+        ws[f"E{r}"].alignment = Alignment(horizontal="left", vertical="center",
+                                          wrap_text=True, indent=1)
+        ws.row_dimensions[r].height = 30
 
-
-# ── Indata (sektion-rubriker och input-celler) ────────────────────────────
 
 def style_indata(ws: Worksheet) -> None:
+    """Indata — sektion-rubriker + input-celler."""
     ws.column_dimensions["A"].width = 2
-    ws.column_dimensions["B"].width = 36
+    ws.column_dimensions["B"].width = 38
     ws.column_dimensions["C"].width = 16
 
-    # Kända sektion-rubriker i iter 8 Indata
     HEADERS = [3, 15, 24, 33, 51, 60, 67]
     for r in HEADERS:
         cell = ws[f"B{r}"]
         if cell.value:
-            section_header(cell, level=2)
+            apply(cell, "section")
+            ws.row_dimensions[r].height = ROW_SECTION
 
-    # Input-celler (C-kolumnen, de flesta rader med siffervärden)
+    # Input-celler i C-kolumnen
     for r in range(4, 70):
-        c = ws[f"C{r}"]
-        if c.value is not None and not (isinstance(c.value, str) and c.value.startswith("=")):
-            input_style(c)
+        cell = ws[f"C{r}"]
+        if cell.value is not None and not (isinstance(cell.value, str)
+                                            and cell.value.startswith("=")):
+            apply(cell, "value")
+            # Input-feel: tunn underline via bottom-rule
+            bottom_rule(cell)
+        # Etiketter i B-kolumnen
+        b = ws[f"B{r}"]
+        if b.value and r not in HEADERS:
+            apply(b, "label")
 
-
-# ── Resultat (sektion-rubriker) ───────────────────────────────────────────
 
 def style_resultat(ws: Worksheet) -> None:
-    ws.column_dimensions["B"].width = 30
-    ws.column_dimensions["C"].width = 16
-    ws.column_dimensions["D"].width = 16
-    ws.column_dimensions["E"].width = 16
+    """Resultat — sektion-rubriker + hero-rad."""
+    ws.column_dimensions["B"].width = 32
+    ws.column_dimensions["C"].width = 18
+    ws.column_dimensions["D"].width = 18
+    ws.column_dimensions["E"].width = 18
 
     for r in range(1, ws.max_row + 1):
         cell = ws[f"B{r}"]
         if isinstance(cell.value, str) and cell.value.isupper() and len(cell.value) > 4:
-            section_header(cell, level=2)
+            apply(cell, "section")
+            ws.row_dimensions[r].height = ROW_SECTION
+
+
+# ── Legacy-funktioner — dirigeras till apply() ────────────────────────────
+
+def section_header(cell, level: int = 1) -> None:
+    apply(cell, "section")
+
+def title_style(cell) -> None:
+    apply(cell, "title")
+
+def subtitle_style(cell) -> None:
+    apply(cell, "caption")
+
+def label_style(cell) -> None:
+    apply(cell, "label")
+
+def input_style(cell) -> None:
+    apply(cell, "value")
+    bottom_rule(cell)
+
+def formula_style(cell) -> None:
+    apply(cell, "value")
+
+def crossref_style(cell) -> None:
+    apply(cell, "value")
+
+def crossref_bold(cell) -> None:
+    apply(cell, "value")
+    cell.font = Font(name=FAMILY, size=SIZE_B, bold=True, color=INK)
+
+def accent_value(cell) -> None:
+    apply(cell, "hero")
+
+def status_ok_style(cell) -> None:
+    apply(cell, "status")
+
+def toc_link_style(cell) -> None:
+    cell.font = Font(name=FAMILY, size=SIZE_B, bold=True, color=INK, underline="single")
+    cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+
+def toc_tag_style(cell) -> None:
+    apply(cell, "caption")
+
+def toc_desc_style(cell) -> None:
+    apply(cell, "caption")
+    cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True, indent=1)

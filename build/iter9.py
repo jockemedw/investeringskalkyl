@@ -324,8 +324,9 @@ def round_p_zebra_oversikt(wb: Workbook) -> int:
     # Översikt — zebra på datablocks i kolumn B:F
     ws = wb["Översikt"]
     from openpyxl.styles import PatternFill as PF
-    light_fill = PF("solid", fgColor=LIGHT)
-    rule_side = Side(style="thin", color=RULE_CLR)
+    from tools.theme import SURFACE, RULE
+    light_fill = PF("solid", fgColor=SURFACE)
+    rule_side = Side(style="thin", color=RULE)
     bottom_rule = Border(bottom=rule_side)
 
     # Block-definitioner: (start_row, end_row, last_col)
@@ -361,66 +362,40 @@ def round_p_zebra_oversikt(wb: Workbook) -> int:
 
 
 def round_q_hero_block(wb: Workbook) -> int:
-    """Round Q: Hero-block — den bindande kravhyran får en senapsgul fokusbox.
+    """Round Q: Faktisk IRR EK som accent + Resultat D14 hero.
 
-    Översikt: C15 (Årshyra mål) → accent_value (stor, gul bg)
-    Resultat: C14:E14 (kravhyrespannet) → också accent
+    Översikt C15 har redan hero via style_oversikt.
     """
     n = 0
-
-    # Översikt — bindande kravhyra som hero
     ws = wb["Översikt"]
-    accent_value(ws["C15"])
-    ws.row_dimensions[15].height = 28
+    from tools.theme import apply, FMT_PCT2
+    apply(ws["C28"], "hero")
+    ws["C28"].number_format = FMT_PCT2
     n += 1
 
-    # Faktisk IRR EK som mini-hero
-    accent_value(ws["C28"])
-    # Behåll FMT_PCT2
-    ws["C28"].number_format = "0.00%"
-    n += 1
-
-    # Resultat — bindande kravhyra
     ws = wb["Resultat"]
     if ws["D14"].value is not None:
-        accent_value(ws["D14"])
-        ws.row_dimensions[14].height = 28
+        apply(ws["D14"], "hero")
+        ws.row_dimensions[14].height = 32
         n += 1
-
     return n
 
 
 def round_r_status_pills(wb: Workbook) -> int:
-    """Round R: Status-pillar med rundade kanter via fyllning + tunn border."""
-    from openpyxl.styles import PatternFill as PF
-    pos_fill = PF("solid", fgColor="E0F2EE")
-    side = Side(style="thin", color=POSITIVE)
-    pill_border = Border(left=side, right=side, top=side, bottom=side)
-
-    n = 0
-    # Översikt rad 25-27 col E
-    ws = wb["Översikt"]
-    for r in [25, 26, 27]:
-        c = ws[f"E{r}"]
-        if c.value:
-            c.font = Font(name=FONT_FAM_BOLD, bold=True, size=10, color=POSITIVE)
-            c.fill = pos_fill
-            c.border = pill_border
-            c.alignment = Alignment(horizontal="center", vertical="center")
-            n += 1
-    return n
+    """Round R: deprecated — styling sker via style_oversikt → apply(cell,'status')."""
+    return 0
 
 
 def round_s_footer(wb: Workbook) -> int:
     """Round S: Sidfot 'Lejonfastigheter · Investeringskalkyl v9 · 2026' på varje flik."""
+    from tools.theme import MUTED as _MUTED
     n = 0
     footer_text = "Lejonfastigheter · Investeringskalkyl v9 · 2026"
-    footer_font = Font(name=FONT_FAM, size=8, color=MUTED, italic=True)
     for sheet_name in wb.sheetnames:
         ws = wb[sheet_name]
         ws.oddFooter.left.text = footer_text
-        ws.oddFooter.left.size = 8
-        ws.oddFooter.left.color = MUTED
+        ws.oddFooter.left.size = 9
+        ws.oddFooter.left.color = _MUTED
         ws.oddFooter.right.text = "Sida &P / &N"
         ws.oddFooter.right.size = 8
         ws.oddFooter.right.color = MUTED
@@ -477,27 +452,16 @@ def round_j_oversikt_fixes(wb: Workbook) -> int:
     - Rensa residual mörkblå fyllning på Kalkylränta/Årshyra-rader (B10, B15)
     - Höj TOC-radhöjder så wrappad beskrivning inte klipps
     """
-    from openpyxl.styles import Font, Alignment
     ws = wb["Översikt"]
     n = 0
 
-    # Merge title och underrad (subtitle)
+    # Merge title och underrad (subtitle) — styling redan satt via style_oversikt
     for merge_range in ["B2:F2", "B3:F3"]:
         try:
             ws.merge_cells(merge_range)
             n += 1
         except Exception:
             pass
-
-    # Banner-titel: vit fet text på mörkblå bg (matchar sektion-headers)
-    ws["B2"].fill = PatternFill("solid", fgColor="1B3A6B")
-    ws["B2"].font = Font(name="Calibri", bold=True, size=14, color="FFFFFF")
-    ws["B2"].alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    ws.row_dimensions[2].height = 32
-    # Subtitle på vit bg, mörk text
-    ws["B3"].fill = NO_FILL
-    ws["B3"].font = Font(name="Calibri", bold=False, size=11, color="4A5568", italic=True)
-    ws["B3"].alignment = Alignment(horizontal="left", vertical="center", indent=1)
 
     # Merge alla sektion-headers (full bredd B:F)
     section_rows = [5, 9, 14, 19, 24, 30]
@@ -581,6 +545,7 @@ def round_m_dokumentation(wb: Workbook) -> int:
     Identifierar numrerade huvudsektioner ('1. Syfte', '2. Grundprincip' …)
     och applicerar enhetlig stil (mörkblå bg, vit fet text).
     """
+    from tools.theme import apply, ROW_SECTION
     ws = wb["Dokumentation"]
     import re
     main_section_re = re.compile(r"^\d+\.\s+\S")
@@ -589,12 +554,12 @@ def round_m_dokumentation(wb: Workbook) -> int:
     for row in ws.iter_rows(min_col=2, max_col=2):
         cell = row[0]
         if isinstance(cell.value, str) and main_section_re.match(cell.value):
-            section_header(cell, level=1)
+            apply(cell, "section")
             try:
                 ws.merge_cells(f"B{cell.row}:E{cell.row}")
             except Exception:
                 pass
-            ws.row_dimensions[cell.row].height = 22
+            ws.row_dimensions[cell.row].height = ROW_SECTION
             n += 1
 
     return n
