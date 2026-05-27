@@ -8,6 +8,7 @@ Genomförda uppgifter (commit-historik förklarar):
 - round E: 'år N' / 'år N+1' → 'år 20' / 'år 21' (explicit horisont)
 - round B: pedagogisk omskrivning av Beräkningslogik-text (användarcentrerad)
 - round C: Indata-fält renamning till branschterminologi
+- round F: designcleanup Lönsamhetskontroll (outline grouping av hjälprader)
 """
 from __future__ import annotations
 import sys, io
@@ -18,7 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from openpyxl import Workbook
-from tools.patches import load_iter, save_iter, ITER8
+from tools.patches import load_iter, save_iter, patch_summary_below, ITER8
 from tools.recalc import recalc
 from tests.regression import check_baseline
 
@@ -112,6 +113,44 @@ def round_b_pedagogisk(wb: Workbook) -> int:
     return len(new_text)
 
 
+def round_f_lonsamhetskontroll_cleanup(wb: Workbook) -> int:
+    """§10 round F: Designcleanup av Lönsamhetskontroll.
+
+    EK-cashflöde hjälprader (rad 43, 64-70) görs åtkomliga men visuellt
+    separerade via Excel outline grouping (toggle [+] i radmarginalen).
+    summaryBelow=False XML-patch körs av main() efter save_iter() så
+    toggle hamnar OVANFÖR gruppen (rad 42 resp. rad 63).
+    """
+    ws = wb["Lönsamhetskontroll"]
+    n = 0
+
+    # Rad 43: etikett (synlig när expanderad), toggle hamnar på rad 42
+    if ws["B43"].value is None:
+        ws["B43"] = "EK-cashflöde år 0–20 (beräkningsunderlag för IRR ovan)"
+        n += 1
+    ws.row_dimensions[43].outlineLevel = 1
+    ws.row_dimensions[43].hidden = True
+    n += 1
+
+    # Rad 63: synlig rubrik — indikator för gruppen nedanför
+    if ws["B63"].value is None:
+        ws["B63"] = "EK-cashflöde per scenario — klicka [+] för att expandera"
+        n += 1
+
+    # Rader 64-70: gruppera och kollapsa (toggle på rad 63)
+    for row in range(64, 71):
+        ws.row_dimensions[row].outlineLevel = 1
+        ws.row_dimensions[row].hidden = True
+    n += 7
+
+    # Rader 35-41: tomma — dölj för att komprimera gap
+    for row in range(35, 42):
+        ws.row_dimensions[row].hidden = True
+    n += 7
+
+    return n
+
+
 def main() -> int:
     out = ROOT / "build" / "iter9.xlsx"
     out.parent.mkdir(exist_ok=True)
@@ -131,13 +170,21 @@ def main() -> int:
     n = round_c_indata_rename(wb)
     print(f"   {n} celler patchade")
 
-    print(f"\n5. Sparar → {out.name}")
+    print("5. Round F: designcleanup Lönsamhetskontroll")
+    n = round_f_lonsamhetskontroll_cleanup(wb)
+    print(f"   {n} rader/celler patchade")
+
+    print(f"\n6. Sparar → {out.name}")
     save_iter(wb, out)
 
-    print("\n6. Recalc (Excel COM / LibreOffice)")
+    print("\n7. XML-patch summaryBelow=False (Lönsamhetskontroll)")
+    patch_summary_below(out, ["sheet6.xml"])
+    print("   patch klar")
+
+    print("\n8. Recalc (Excel COM / LibreOffice)")
     recalc(out)
 
-    print("\n7. Regressionstest:")
+    print("\n9. Regressionstest:")
     res = check_baseline(out)
     if res["rent"] is not None:
         print(f"   Hyra={res['rent']:,.2f}  IRR={res['irr']:.4%}  margin={res['margin']*100:+.2f} pp")

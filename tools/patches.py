@@ -106,3 +106,34 @@ def diff_workbooks(path_a: Path | str, path_b: Path | str) -> dict:
         if sheet_diffs:
             diffs[name] = sheet_diffs
     return diffs
+
+
+def patch_summary_below(xlsx_path, sheet_filenames):
+    """XML-patch: satt summaryBelow=0 pa angivna sheet-XML-filer (TECH §1).
+
+    Kraevs efter save_iter() saa att rad-outline-toggle hamnar OVANFOR gruppen.
+    sheet_filenames: lista med interna filnamn, t.ex. ['sheet6.xml'].
+    """
+    import re, shutil, zipfile as _zf
+    from pathlib import Path as _P
+    p = _P(xlsx_path)
+    tmp = p.with_suffix('.xlsx.tmp')
+    with _zf.ZipFile(p, 'r') as zin:
+        with _zf.ZipFile(tmp, 'w', _zf.ZIP_DEFLATED) as zout:
+            for item in zin.namelist():
+                data = zin.read(item)
+                if item.split('/')[-1] in sheet_filenames:
+                    text = data.decode('utf-8')
+                    if '<outlinePr' in text:
+                        text = re.sub(
+                            r'<outlinePr([^/>]*)summaryBelow="[01]"',
+                            r'<outlinePr\1summaryBelow="0"',
+                            text,
+                        )
+                        if 'summaryBelow="0"' not in text:
+                            text = text.replace('<outlinePr', '<outlinePr summaryBelow="0"', 1)
+                    else:
+                        text = text.replace('<sheetData', '<sheetPr><outlinePr summaryBelow="0"/></sheetPr><sheetData', 1)
+                    data = text.encode('utf-8')
+                zout.writestr(item, data)
+    shutil.move(str(tmp), str(p))
