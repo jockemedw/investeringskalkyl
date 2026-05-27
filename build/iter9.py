@@ -23,6 +23,7 @@ from openpyxl import Workbook
 from openpyxl.worksheet.hyperlink import Hyperlink
 from tools.patches import load_iter, save_iter, patch_summary_below, ITER8
 from tools.recalc import recalc
+from tools.styling import style_oversikt, style_indata, style_resultat
 from tests.regression import check_baseline
 
 
@@ -307,17 +308,23 @@ def main() -> int:
     n = round_g_oversikt_redesign(wb)
     print(f"   {n} sektioner skrivna")
 
-    print(f"\n7. Sparar → {out.name}")
+    print("7. Round H: finansmodell-styling (färg, format, typografi)")
+    style_oversikt(wb["Översikt"])
+    style_indata(wb["Indata"])
+    style_resultat(wb["Resultat"])
+    print("   styling klar")
+
+    print(f"\n9. Sparar → {out.name}")
     save_iter(wb, out)
 
-    print("\n8. XML-patch summaryBelow=False (Lönsamhetskontroll)")
+    print("\n10. XML-patch summaryBelow=False (Lönsamhetskontroll)")
     patch_summary_below(out, ["sheet6.xml"])
-    print("   patch klar")
+    print("    patch klar")
 
-    print("\n9. Recalc (Excel COM / LibreOffice)")
+    print("\n11. Recalc (Excel COM / LibreOffice)")
     recalc(out)
 
-    print("\n10. Regressionstest:")
+    print("\n12. Regressionstest:")
     res = check_baseline(out)
     if res["rent"] is not None:
         print(f"    Hyra={res['rent']:,.2f}  IRR={res['irr']:.4%}  margin={res['margin']*100:+.2f} pp")
