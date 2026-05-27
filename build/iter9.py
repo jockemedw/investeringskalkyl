@@ -9,6 +9,7 @@ Genomförda uppgifter (commit-historik förklarar):
 - round B: pedagogisk omskrivning av Beräkningslogik-text (användarcentrerad)
 - round C: Indata-fält renamning till branschterminologi
 - round F: designcleanup Lönsamhetskontroll (outline grouping av hjälprader)
+- round G: Översikt om till beslutsdokument (projektinfo + kalkylantaganden)
 """
 from __future__ import annotations
 import sys, io
@@ -19,6 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from openpyxl import Workbook
+from openpyxl.worksheet.hyperlink import Hyperlink
 from tools.patches import load_iter, save_iter, patch_summary_below, ITER8
 from tools.recalc import recalc
 from tests.regression import check_baseline
@@ -151,6 +153,133 @@ def round_f_lonsamhetskontroll_cleanup(wb: Workbook) -> int:
     return n
 
 
+def round_g_oversikt_redesign(wb: Workbook) -> int:
+    """§10 round G: Översikt om till beslutsdokument.
+
+    Lägger till PROJEKTINFORMATION (redigerbara Fyll i-celler) och
+    KALKYLANTAGANDEN (formler mot Indata) ovanför befintliga resultatblock.
+    Innehållsförteckning skrivs om med korrekta hyperlänkar och förskjuts ner.
+    Alla befintliga formler (Resultat, Lönsamhetskontroll) bevaras.
+    """
+    ws = wb["Översikt"]
+
+    # Rensa rader 2-50 — unmerga först, sedan nolla värden
+    for merged in list(ws.merged_cells.ranges):
+        ws.unmerge_cells(str(merged))
+    for r in range(2, 51):
+        for c in range(1, 11):
+            cell = ws.cell(r, c)
+            cell.value = None
+            cell.hyperlink = None
+
+    def set_val(coord, val):
+        ws[coord] = val
+
+    # ── Titel ────────────────────────────────────────────────────────────────
+    set_val("B2", "INVESTERINGSKALKYL — LEJONFASTIGHETER AB")
+    set_val("B3", '=IF(Indata!B26="","(projekt ej namngivet)","Projekt: "&Indata!B26)')
+
+    # ── A. PROJEKTINFORMATION ────────────────────────────────────────────────
+    set_val("B5", "PROJEKTINFORMATION")
+    set_val("B6", "Fastighet")
+    set_val("C6", "Fyll i")
+    set_val("E6", "Utförd av")
+    set_val("F6", "Fyll i")
+    set_val("B7", "Kalkylstart")
+    set_val("C7", "=Indata!C5")
+    set_val("E7", "Kalkylperiod")
+    set_val("F7", '=Indata!C16&" år"')
+
+    # ── B. KALKYLANTAGANDEN ──────────────────────────────────────────────────
+    set_val("B9", "KALKYLANTAGANDEN")
+    set_val("B10", "Kalkylränta driftnetto")
+    set_val("C10", "=Indata!C7")
+    set_val("E10", "IRR-krav EK")
+    set_val("F10", "=Indata!C65")
+    set_val("B11", "Direktavkastning marknad")
+    set_val("C11", "=Indata!C6")
+    set_val("E11", "Belåningsgrad")
+    set_val("F11", "=Indata!C64")
+    set_val("B12", "Inflation")
+    set_val("C12", "=Indata!C8")
+
+    # ── C. BINDANDE KRAVHYRA ─────────────────────────────────────────────────
+    set_val("B14", "BINDANDE KRAVHYRA")
+    set_val("B15", "Årshyra (mål-utfall)")
+    set_val("C15", "=Resultat!D14")
+    set_val("E15", "Bindande krav")
+    set_val("F15", "=Resultat!D15")
+    set_val("B16", "Per kvm/år")
+    set_val("C16", "=Resultat!D16")
+    set_val("E16", "Total area")
+    set_val("F16", '=Indata!F31&" m²"')
+    set_val("B17", "Total investering")
+    set_val("C17", "=Indata!R31")
+    set_val("E17", "Investering per kvm")
+    set_val("F17", "=IFERROR(Indata!R31/Indata!F31,0)")
+
+    # ── D. HYRESSPANN ────────────────────────────────────────────────────────
+    set_val("B19", "HYRESSPANN VID INVESTERINGSUTFALL")
+    set_val("B20", "Lägsta utfall (-X%)")
+    set_val("C20", "=Resultat!C14")
+    set_val("E20", "=Resultat!C7")
+    set_val("B21", "Mål-utfall (bindande)")
+    set_val("C21", "=Resultat!D14")
+    set_val("E21", "=Resultat!D7")
+    set_val("B22", "Högsta utfall (+X%)")
+    set_val("C22", "=Resultat!E14")
+    set_val("E22", "=Resultat!E7")
+
+    # ── E. LÖNSAMHETSKRAV ────────────────────────────────────────────────────
+    set_val("B24", "LÖNSAMHETSKRAV — STATUS VID BINDANDE KRAVHYRA")
+    set_val("B25", "1. NPV ≥ 0")
+    set_val("C25", "=Lönsamhetskontroll!C9")
+    set_val("E25", "=Lönsamhetskontroll!D9")
+    set_val("B26", "2. IRR EK ≥ avkastningskrav")
+    set_val("C26", "=Lönsamhetskontroll!C18")
+    set_val("E26", "=Lönsamhetskontroll!D18")
+    set_val("B27", "3. MV år 20 ≥ Bokfört värde år 20")
+    set_val("C27", "=Lönsamhetskontroll!C30")
+    set_val("E27", "=Lönsamhetskontroll!D30")
+    set_val("B28", "Faktisk IRR EK")
+    set_val("C28", "=Lönsamhetskontroll!C45")
+    set_val("E28", "Marginal mot krav")
+    set_val("F28", "=Lönsamhetskontroll!C47")
+
+    # ── F. INNEHÅLLSFÖRTECKNING ──────────────────────────────────────────────
+    set_val("B30", "INNEHÅLLSFÖRTECKNING")
+
+    toc = [
+        (32, "Indata",              "Inmatning",            "Indata",
+         "Marknadsförutsättningar, investering, hyresobjekt, drift, finansiering."),
+        (34, "Resultat",            "Vad blir hyran?",      "Resultat",
+         "Kravhyra för de tre lönsamhetskraven, bindande hyra och hyresspann."),
+        (36, "Kassaflöde",          "Driftnetto år för år", "Kassaflöde",
+         "Driftnetto-projektion vid bindande hyra (bruttohyra → driftnetto)."),
+        (38, "Finansiering",        "Lån och avskrivning",  "Finansiering",
+         "Lånebild: lån, amortering, räntekostnad, eget kapital, avskrivning."),
+        (40, "Lönsamhetskontroll",  "Är kraven uppfyllda?", "Lönsamhetskontroll",
+         "Verifiering av tre lönsamhetskrav, faktisk IRR EK och känslighetsanalys."),
+        (42, "Beräkningslogik",     "Hur räknar mallen?",   "Beräkningslogik",
+         "Delta-metoden + tekniska beräkningsblock A–F bakom kravhyran."),
+        (44, "Dokumentation",       "Varför så här?",       "Dokumentation",
+         "Designprinciper, val och paritetstest mot LM 371."),
+    ]
+
+    for row, name, tagline, target_sheet, desc in toc:
+        cell = ws.cell(row, 2)
+        cell.value = name
+        cell.hyperlink = Hyperlink(
+            ref=cell.coordinate,
+            location=f"'{target_sheet}'!A1",
+            display=name,
+        )
+        ws.cell(row, 3).value = tagline
+        ws.cell(row, 5).value = desc
+
+    return 1
+
+
 def main() -> int:
     out = ROOT / "build" / "iter9.xlsx"
     out.parent.mkdir(exist_ok=True)
@@ -174,24 +303,28 @@ def main() -> int:
     n = round_f_lonsamhetskontroll_cleanup(wb)
     print(f"   {n} rader/celler patchade")
 
-    print(f"\n6. Sparar → {out.name}")
+    print("6. Round G: Översikt om till beslutsdokument")
+    n = round_g_oversikt_redesign(wb)
+    print(f"   {n} sektioner skrivna")
+
+    print(f"\n7. Sparar → {out.name}")
     save_iter(wb, out)
 
-    print("\n7. XML-patch summaryBelow=False (Lönsamhetskontroll)")
+    print("\n8. XML-patch summaryBelow=False (Lönsamhetskontroll)")
     patch_summary_below(out, ["sheet6.xml"])
     print("   patch klar")
 
-    print("\n8. Recalc (Excel COM / LibreOffice)")
+    print("\n9. Recalc (Excel COM / LibreOffice)")
     recalc(out)
 
-    print("\n9. Regressionstest:")
+    print("\n10. Regressionstest:")
     res = check_baseline(out)
     if res["rent"] is not None:
-        print(f"   Hyra={res['rent']:,.2f}  IRR={res['irr']:.4%}  margin={res['margin']*100:+.2f} pp")
+        print(f"    Hyra={res['rent']:,.2f}  IRR={res['irr']:.4%}  margin={res['margin']*100:+.2f} pp")
     if res["ok"]:
-        print("   ✓ Regression OK")
+        print("    ✓ Regression OK")
         return 0
-    print("   ✗ FAIL:", res["fails"])
+    print("    ✗ FAIL:", res["fails"])
     return 1
 
 
