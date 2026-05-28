@@ -2328,6 +2328,284 @@ def round_ad_indata_vertical_labels(wb: Workbook) -> int:
     return n
 
 
+def round_ae_design_harmony(wb: Workbook) -> int:
+    """Round AE: Enhetligt designsystem över alla 9 flikar.
+
+    Designsystem
+    ────────────
+    Färger:       INK (#10313E) primär, ACCENT (#FAB600) hero/eyebrow,
+                  MUTED (#6C757D) subtitel/caption, SURFACE (#F4F6F8)
+                  tabellheader/zebra, POSITIVE (#00937C) status.
+    Eliminerar:   gammal blå (#1B4F72) över hela workbooken.
+
+    Rubrikhierarki:
+      H0  Eyebrow      8pt ACCENT Semibold ALL CAPS         (B-rad)
+      H1  Display      22pt INK Light                       (flikens titel)
+      H1' Subtitle     11pt MUTED                           (under titel)
+      H2  Section      11pt INK Semibold ALL CAPS + INK bottom-rule
+      H3  Subsection   10pt INK Semibold
+      TH  TableHeader  10pt INK Semibold + SURFACE-bg + RULE-bottom
+
+    Försättsblad + Översikt behåller sina hero-headers (eget större mönster).
+    Övriga 7 flikar får eyebrow+display+subtitle på rad 1-3.
+
+    Sektionsbanners (1B4F72-fyllning, vit text) → underline-sektioner
+    över hela workbooken. Total konvergens.
+    """
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from tools.theme import INK, MUTED, PAPER, SURFACE, ACCENT, RULE, FAMILY
+
+    LEGACY_BLUE = "1B4F72"  # gammal blå från iter8
+    NO_FILL = PatternFill(fill_type=None)
+    rule_side = Side(style="thin", color=RULE)
+    ink_side = Side(style="thin", color=INK)
+
+    def _norm_color(rgb: str | None) -> str | None:
+        """Plocka ut hex utan FF-prefix."""
+        if not rgb or not isinstance(rgb, str):
+            return None
+        rgb = rgb.upper()
+        if len(rgb) == 8 and rgb.startswith("FF"):
+            return rgb[2:]
+        return rgb if len(rgb) == 6 else None
+
+    n = 0
+
+    # ── 1. Globalt: ersätt LEGACY_BLUE överallt med INK ─────────────────────
+    for sheet in wb.sheetnames:
+        ws = wb[sheet]
+        for row in ws.iter_rows():
+            for c in row:
+                # Fontfärg
+                if c.font and c.font.color:
+                    fc = _norm_color(c.font.color.rgb)
+                    if fc == LEGACY_BLUE:
+                        c.font = Font(
+                            name=c.font.name or FAMILY,
+                            size=c.font.size,
+                            bold=c.font.bold,
+                            italic=c.font.italic,
+                            color=INK,
+                            underline=c.font.underline,
+                        )
+                        n += 1
+                # Fyllning
+                if c.fill and c.fill.fgColor:
+                    bg = _norm_color(c.fill.fgColor.rgb)
+                    if bg == LEGACY_BLUE:
+                        c.fill = PatternFill("solid", fgColor=INK)
+                        n += 1
+
+    # ── 2. H1-pattern för "enkla" flikar (Indata/Kassaflöde/Finansiering/   ─
+    #      Resultat/Lönsamhetskontroll/Beräkningslogik/Dokumentation) ───────
+    # Försättsblad + Översikt har redan eget hero-pattern (eyebrow+display+sub).
+    H1_SHEETS = {
+        "Indata":              ("Indata",              "Investeringsförutsättningar och parametrar"),
+        "Kassaflöde":          ("Kassaflöde",          "Driftnettoprojektion över kalkylperioden"),
+        "Finansiering":        ("Finansiering",        "Lån, ränta, amortering och avskrivning"),
+        "Resultat":            ("Resultat",            "Kravhyra och utfall vid bindande hyra"),
+        "Lönsamhetskontroll":  ("Lönsamhetskontroll",  "Tre lönsamhetskrav och faktisk IRR"),
+        "Beräkningslogik":     ("Beräkningslogik",     "Så fungerar mallens kärnberäkning"),
+        "Dokumentation":       ("Dokumentation",       "Antaganden, formler och versionsanteckningar"),
+    }
+
+    for sheet_name, (title, subtitle) in H1_SHEETS.items():
+        if sheet_name not in wb.sheetnames:
+            continue
+        ws = wb[sheet_name]
+
+        # B1 → eyebrow ("LEJONFASTIGHETER · FLIKNAMN")
+        # B2 → display (flikens namn)
+        # B3 → subtitle
+        # Rensa eventuella merges på dessa rader först (idempotens)
+        existing = list(ws.merged_cells.ranges)
+        for mr in existing:
+            if mr.min_row in (1, 2, 3) and mr.min_col == 2:
+                try:
+                    ws.unmerge_cells(str(mr))
+                except Exception:
+                    pass
+
+        # Eyebrow B1
+        eyebrow_text = f"LEJONFASTIGHETER · {title.upper()}"
+        ws["B1"] = eyebrow_text
+        ws["B1"].font = Font(name="Segoe UI Semibold", size=8, color=ACCENT, bold=True)
+        ws["B1"].fill = NO_FILL
+        ws["B1"].alignment = Alignment(horizontal="left", vertical="center")
+        ws["B1"].border = Border()
+        ws.row_dimensions[1].height = 14
+
+        # Display B2 — flikens titel
+        ws["B2"] = title
+        ws["B2"].font = Font(name="Segoe UI Light", size=22, color=INK, bold=False)
+        ws["B2"].fill = NO_FILL
+        ws["B2"].alignment = Alignment(horizontal="left", vertical="center")
+        ws["B2"].border = Border()
+        ws.row_dimensions[2].height = 30
+
+        # Subtitle B3
+        ws["B3"] = subtitle
+        ws["B3"].font = Font(name=FAMILY, size=11, color=MUTED)
+        ws["B3"].fill = NO_FILL
+        ws["B3"].alignment = Alignment(horizontal="left", vertical="center")
+        ws["B3"].border = Border()
+        ws.row_dimensions[3].height = 18
+
+        # Hairline under header (rad 4)
+        for col_letter in ["B", "C", "D", "E", "F", "G"]:
+            try:
+                ws[f"{col_letter}4"].border = Border(bottom=Side(style="thin", color=RULE))
+            except Exception:
+                pass
+        # rad 4 är ofta tom buffer på de flesta flikar — sätt liten höjd
+        # Men: Kassaflöde/Finansiering/Beräkningslogik har data på rad 3-4.
+        # Skydd: bara sätt om cell är tom.
+        if ws["B4"].value in (None, ""):
+            ws.row_dimensions[4].height = 8
+        n += 1
+
+    # ── 3. Sektionsheaders: konvergera mot underline-stil ───────────────────
+    # Strategi: walka alla celler i kolumn B. Identifiera sektionsheaders
+    # genom att de antingen har INK/LEGACY_BLUE/PAPER-fyllning ELLER vit text
+    # (PAPER-färg). Dessa var "blå banners" i iter8. Konvertera till underline.
+    # Också: text som börjar med "N. " och är bold = numrerad sektion.
+    import re
+
+    SHEETS_FOR_SECTION_HARMONY = [
+        "Indata", "Kassaflöde", "Finansiering", "Resultat",
+        "Lönsamhetskontroll", "Beräkningslogik", "Dokumentation",
+    ]
+
+    numbered_re = re.compile(r"^\d+\.\s+\S")
+
+    def _is_section_header(cell) -> bool:
+        v = cell.value
+        if not isinstance(v, str):
+            return False
+        stripped = v.strip()
+        if len(stripped) < 5 or len(stripped) > 100:
+            return False
+        # Tecken på att det VAR en banner:
+        # a) Font-färg är vit (PAPER) — typisk banner-text
+        font_color = _norm_color(cell.font.color.rgb if (cell.font and cell.font.color) else None)
+        is_white_text = font_color == PAPER
+        # b) Cellen har INK-fyllning (efter vår steg-1-konvertering)
+        fill_color = _norm_color(cell.fill.fgColor.rgb if (cell.fill and cell.fill.fgColor) else None)
+        has_ink_fill = fill_color == INK
+        # c) Numrerad sektion med bold
+        is_numbered_bold = bool(numbered_re.match(stripped)) and cell.font and cell.font.bold
+        # d) ALL CAPS bold (lik en sektionstitel)
+        letters = [ch for ch in stripped if ch.isalpha()]
+        looks_caps = bool(letters) and sum(1 for ch in letters if ch.isupper()) / len(letters) >= 0.85
+        is_caps_bold = looks_caps and cell.font and cell.font.bold and cell.font.size and cell.font.size >= 10
+
+        return is_white_text or has_ink_fill or is_numbered_bold or is_caps_bold
+
+    for sheet_name in SHEETS_FOR_SECTION_HARMONY:
+        if sheet_name not in wb.sheetnames:
+            continue
+        ws = wb[sheet_name]
+
+        for row in ws.iter_rows(min_col=2, max_col=2, min_row=4):
+            cell = row[0]
+            if not _is_section_header(cell):
+                continue
+            r = cell.row
+            if r in (1, 2, 3):
+                continue
+
+            # Applicera sektion-stil
+            cell.font = Font(name="Segoe UI Semibold", size=11, color=INK, bold=True)
+            cell.fill = NO_FILL
+            cell.alignment = Alignment(horizontal="left", vertical="center", indent=0)
+            cell.border = Border(bottom=ink_side)
+
+            # Hitta faktisk max-kolumn för raden (sektionsdata under)
+            from openpyxl.utils import column_index_from_string
+            max_idx = 28  # AB
+            actual_max = 2
+            for col_idx in range(2, max_idx + 1):
+                if ws.cell(r, col_idx).value not in (None, ""):
+                    actual_max = max(actual_max, col_idx)
+                # Titta också nästa 2 rader
+                for look in range(1, 4):
+                    if ws.cell(r + look, col_idx).value not in (None, ""):
+                        actual_max = max(actual_max, col_idx)
+            actual_max = max(actual_max, 7)
+
+            # Sätt underline över hela bredden, rensa fyllning
+            for col_idx in range(2, actual_max + 1):
+                target = ws.cell(r, col_idx)
+                if col_idx > 2:
+                    target.fill = NO_FILL
+                    # Bevara font-storlek men rensa vit/legacy-färg från grannar
+                    if target.font:
+                        tcolor = _norm_color(target.font.color.rgb if target.font.color else None)
+                        if tcolor == PAPER:
+                            target.font = Font(
+                                name=target.font.name or FAMILY,
+                                size=target.font.size or 10,
+                                bold=target.font.bold,
+                                color=INK,
+                            )
+                target.border = Border(bottom=ink_side)
+
+            ws.row_dimensions[r].height = 22
+            n += 1
+
+    # ── 4. Tabellheader-rader: konvergera SURFACE-bg sektioner ──────────────
+    # På Resultat och Lönsamhetskontroll finns "tabell-header"-rader (B6, B24
+    # på Resultat; B53 på Lönsamhetskontroll) som hade F2F3F4-fyllning.
+    # Konvertera till SURFACE-fyllning + INK Semibold + tunn RULE bottom-rule.
+    TABLE_HEADER_HINTS = [
+        ("Resultat",            [6, 24]),
+        ("Lönsamhetskontroll",  [53]),
+        ("Kassaflöde",          [29]),
+        ("Beräkningslogik",     [25, 52]),
+    ]
+    for sheet_name, rows in TABLE_HEADER_HINTS:
+        if sheet_name not in wb.sheetnames:
+            continue
+        ws = wb[sheet_name]
+        for r in rows:
+            # Skanna rad för celler med innehåll, stylа dem som table_header
+            for col_idx in range(2, 25):
+                cell = ws.cell(r, col_idx)
+                if cell.value in (None, ""):
+                    continue
+                cell.font = Font(name="Segoe UI Semibold", size=10, color=INK, bold=True)
+                cell.fill = PatternFill("solid", fgColor=SURFACE)
+                cell.border = Border(bottom=rule_side)
+                # Behåll alignment (kan vara höger för tal-headers)
+                if cell.alignment and cell.alignment.horizontal:
+                    cell.alignment = Alignment(
+                        horizontal=cell.alignment.horizontal,
+                        vertical="center",
+                    )
+                else:
+                    cell.alignment = Alignment(horizontal="left", vertical="center")
+                n += 1
+            ws.row_dimensions[r].height = 20
+
+    # ── 5. Resultat: B1 (gammal "RESULTAT"-banner) — ta bort dupliceringen ─
+    # Round AE satte redan B1=eyebrow, B2=display, B3=subtitle på Resultat.
+    # Round T/U/J kan ha lämnat fyllningar på B1 — säkerställ NO_FILL där.
+    # (Detta hanteras redan i loop 2.)
+
+    # ── 6. Försättsblad + Översikt: behåll men säkerställ konsekvent eyebrow
+    #      Försättsblad har redan B2 eyebrow (size=8, ACCENT).
+    #      Översikt har B16 eyebrow — låt det vara, det är inom hero-block.
+    # (Inga ändringar krävs.)
+
+    # ── 7. Indata: B1 är nu vår nya display "Indata" (size 22). round_ad
+    #      hade dolt B1 via vertikala labels. Säkerställ att B1-cellen
+    #      inte krockar med dem genom att merga B1:G1 om möjligt — men
+    #      eftersom kolumn A=nav-gutter, börjar vi vid B.
+    # (Implementerat i loop 2.)
+
+    return n
+
+
 def round_ab_sidenav(wb: Workbook) -> int:
     """Round AB: Sidnavigator på alla flikar.
 
@@ -2476,6 +2754,10 @@ def main() -> int:
     print("8w. Round AD: Indata vertikala sektionsetiketter")
     n = round_ad_indata_vertical_labels(wb)
     print(f"    {n} sektionsetiketter")
+
+    print("8x. Round AE: enhetligt designsystem (rubrikhierarki, palett, sektioner)")
+    n = round_ae_design_harmony(wb)
+    print(f"    {n} celler harmoniserade")
 
     # Indata-specifikt: print_area A-start så vertikala labels syns i PDF
     import re as _re

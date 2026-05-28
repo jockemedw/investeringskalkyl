@@ -49,6 +49,13 @@ ROLES = {
     "status":  (SIZE_B, True,  POSITIVE, POSITIVE_TINT, "center", 0),
     "caption": (SIZE_C, False, MUTED, None,          "left",   1),
     "caption_right": (SIZE_C, False, MUTED, None,    "right",  0),
+    # ── AE-roller: enhetlig hierarki över alla flikar ───────────────────────
+    "eyebrow":     (8,  True,  ACCENT, None, "left",  0),  # ALL CAPS över H1
+    "h1_display":  (22, False, INK,    None, "left",  0),  # flikens titel
+    "h1_subtitle": (11, False, MUTED,  None, "left",  0),  # dek under titel
+    "h2_section":  (11, True,  INK,    None, "left",  0),  # ALL CAPS sektion
+    "h3_sub":      (10, True,  INK,    None, "left",  0),  # underrubrik
+    "table_header": (10, True, INK,    SURFACE, "left", 0),  # tabell-kolumnrubrik
 }
 
 # ── Radhöjder ──────────────────────────────────────────────────────────────
