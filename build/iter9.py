@@ -1183,13 +1183,13 @@ def round_u_oversikt_v2(wb: Workbook) -> int:
     for col, w in widths.items():
         ws.column_dimensions[col].width = w
 
-    # Hero-bild
+    # Hero-bild — anchora vid B1 så nav-spalten i column A inte överlappas
     hero_path = ROOT / "assets" / "hero.png"
     if hero_path.exists():
         img = XLImage(str(hero_path))
         img.width = 1200
         img.height = 380
-        ws.add_image(img, "A1")
+        ws.add_image(img, "B1")
     for r in range(1, 15):
         ws.row_dimensions[r].height = 20
 
@@ -2204,6 +2204,154 @@ def round_x_kanslighet(wb: Workbook) -> int:
     return len(rows)
 
 
+def round_aa_typography_purge(wb: Workbook) -> int:
+    """Round AA: Globalt typografi-purge — Cambria/Calibri → Segoe UI.
+
+    iter8-baseline har 6180 Cambria + 9224 Calibri-celler. theme.py och
+    alla iter9-rounds använder Segoe UI. Walka alla celler, normalisera
+    fontnamn till Segoe UI-familjen, behåll storlek/vikt/färg.
+
+    Mapping:
+      Cambria         → Segoe UI
+      Calibri         → Segoe UI
+      Calibri Light   → Segoe UI Light
+      Cambria (Body)  → Segoe UI
+    """
+    from openpyxl.styles import Font
+
+    family_map = {
+        "Cambria": "Segoe UI",
+        "Cambria (Body)": "Segoe UI",
+        "Calibri": "Segoe UI",
+        "Calibri Light": "Segoe UI Light",
+        "Calibri (Body)": "Segoe UI",
+    }
+    n = 0
+    for sheet in wb.sheetnames:
+        ws = wb[sheet]
+        for row in ws.iter_rows():
+            for c in row:
+                if c.font and c.font.name in family_map:
+                    new_name = family_map[c.font.name]
+                    c.font = Font(
+                        name=new_name,
+                        size=c.font.size,
+                        bold=c.font.bold,
+                        italic=c.font.italic,
+                        color=c.font.color,
+                        underline=c.font.underline,
+                    )
+                    n += 1
+    return n
+
+
+def round_ac_post_nav_fixes(wb: Workbook) -> int:
+    """Round AC: Fixar efter att sidnav adderats.
+
+    1. Print_area startar från B på alla flikar (nav-spalt utesluts från PDF)
+    2. Resultat D14 (bindande kravhyra) får större ACCENT-hero-treatment
+    3. Försättsblad: justera nav-zon till hela fliken
+    """
+    from tools.theme import ACCENT, INK
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    n = 0
+
+    # ── 1. Print_area B-start på alla flikar ─────────────────────────────────
+    # openpyxl returnerar print_area i full form: "'Sheet'!$A$1:$F$50"
+    # Vi ersätter bara start-kolumnen $A$ → $B$ i den första ankaren.
+    import re
+    for sheet in wb.sheetnames:
+        ws = wb[sheet]
+        pa = ws.print_area
+        if not pa:
+            continue
+        # Byt första $A$ till $B$ (start-cellen i intervallet)
+        new_pa = re.sub(r"(\!?\$)A(\$\d+:)", r"\1B\2", pa, count=1)
+        if new_pa != pa:
+            ws.print_area = new_pa
+            n += 1
+
+    # ── 2. Resultat D14 — bindande kravhyra som dominant hero ─────────────────
+    ws = wb["Resultat"]
+    cell = ws["D14"]
+    if cell.value is not None:
+        cell.font = Font(name="Segoe UI Semibold", size=20, color=INK, bold=True)
+        cell.fill = PatternFill("solid", fgColor=ACCENT)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        ws.row_dimensions[14].height = 44
+        n += 1
+
+    return n
+
+
+def round_ad_indata_vertical_labels(wb: Workbook) -> int:
+    """Round AD: Vertikala sektionsetiketter på Indata.
+
+    Roterad text i column A (INK-bg från sidnav) — ger strukturell läsbarhet
+    enligt referensbildens grepp. Sektion 1 hoppas över (krockar med nav-rader
+    2-10). Sektion 8 är för kort (3 rader) — får ingen vertikal etikett.
+    """
+    from tools.theme import PAPER, ACCENT
+    from openpyxl.styles import Font, Alignment
+
+    ws = wb["Indata"]
+
+    # (start_row, end_row, label)
+    sections = [
+        (15, 23, "INVESTERING"),
+        (24, 33, "HYRESOBJEKT"),
+        (34, 42, "DRIFT & UH"),
+        (43, 51, "RE-INVEST."),
+        (52, 59, "ÖVRIGA"),
+        (60, 66, "FINANSIERING"),
+        (70, 81, "RESTVÄRDE"),
+    ]
+
+    n = 0
+    for start, end, label in sections:
+        # Merge column A över sektionens radrange
+        try:
+            ws.merge_cells(start_row=start, end_row=end, start_column=1, end_column=1)
+        except Exception:
+            pass
+
+        cell = ws.cell(start, 1)
+        cell.value = label
+        cell.font = Font(name="Segoe UI Semibold", size=9, color=ACCENT, bold=True)
+        cell.alignment = Alignment(
+            horizontal="center",
+            vertical="center",
+            text_rotation=90,
+        )
+        n += 1
+
+    return n
+
+
+def round_ab_sidenav(wb: Workbook) -> int:
+    """Round AB: Sidnavigator på alla flikar.
+
+    Genererar PNG-knappar (tools/sidenav.py) och placerar i column A.
+    Aktiv flik = ljus PAPER med accent-balk. Inaktiv = mörk INK.
+    Hyperlänk på cellen bakom bilden gör hela raden klickbar.
+
+    Frys-pane sätts till B1 så sidopanelen stannar vid horisontell scroll.
+    """
+    from tools.sidenav import generate_assets, apply_to_sheet, NAV_ITEMS
+
+    asset_paths = generate_assets()
+    nav_sheet_names = {name for name, _ in NAV_ITEMS}
+
+    n = 0
+    for sheet_name in wb.sheetnames:
+        if sheet_name not in nav_sheet_names:
+            continue
+        ws = wb[sheet_name]
+        apply_to_sheet(ws, sheet_name, asset_paths)
+        n += 1
+    return n
+
+
 def main() -> int:
     out = ROOT / "build" / "iter9.xlsx"
     out.parent.mkdir(exist_ok=True)
@@ -2312,6 +2460,28 @@ def main() -> int:
     print("8s. Round Z: Resultat — utfall vid bindande kravhyra")
     n = round_z_resultat_utfall(wb)
     print(f"    {n} rader byggda")
+
+    print("8t. Round AA: typografi-purge (Cambria/Calibri → Segoe UI)")
+    n = round_aa_typography_purge(wb)
+    print(f"    {n} celler normaliserade")
+
+    print("8u. Round AB: sidnavigator på alla flikar")
+    n = round_ab_sidenav(wb)
+    print(f"    {n} flikar med nav")
+
+    print("8v. Round AC: post-nav-fixar (print_area, Resultat-hero)")
+    n = round_ac_post_nav_fixes(wb)
+    print(f"    {n} ändringar")
+
+    print("8w. Round AD: Indata vertikala sektionsetiketter")
+    n = round_ad_indata_vertical_labels(wb)
+    print(f"    {n} sektionsetiketter")
+
+    # Indata-specifikt: print_area A-start så vertikala labels syns i PDF
+    import re as _re
+    _pa = wb["Indata"].print_area
+    if _pa:
+        wb["Indata"].print_area = _re.sub(r"(\!?\$)B(\$\d+:)", r"\1A\2", _pa, count=1)
 
     print(f"\n9. Sparar → {out.name}")
     save_iter(wb, out)
