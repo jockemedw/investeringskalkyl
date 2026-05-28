@@ -63,7 +63,8 @@ För ny §10-uppgift: lägg till `round_X_*(wb)` i [build/iter9.py](build/iter9.
 
 Status (senaste rad = överst):
 
-- [ ] **NÄSTA:** Total designreview av iter9 (kör `/xlsx-review build/iter9.xlsx`, åtgärda fynd)
+- [ ] **NÄSTA:** (öppen — Joakim väljer)
+- [x] Round AE: enhetligt designsystem — eyebrow/H1/H2-harmoni över alla 9 flikar (commit f25bfe7). Nya roller i `tools/theme.py`: `eyebrow`, `h1_display`, `h1_subtitle`, `h2_section`, `h3_sub`, `table_header`. Blå banner-sektioner ersatta med tunn underline-rule.
 - [x] Round Z: Resultat — utfall vid bindande kravhyra (NPV/IRR/MV-status, refererar Lönsamhetskontroll)
 - [x] Round Y: Indata-beskrivningar sektion 6-9 + räntenivå-renamning (Aktuell / Långsiktig)
 - [x] Round X: känslighetstabell restvärdesbedömning (Lönsamhetskontroll rad 73+, opt/bedömt/pess × kravhyror + MV)
