@@ -71,14 +71,22 @@ def round_e_year_n(wb: Workbook) -> int:
 def round_c_indata_rename(wb: Workbook) -> int:
     """§10: Indata-fält renamning till branschterminologi.
 
-    Tre celler byter etikett:
+    Celler som byter etikett:
     - Indata!B18: 'Avskrivnings-% per år' → 'Avskrivningstakt'
-    - Indata!B62: 'Långsiktig ränta' → 'Räntenivå' (matchar Finansiering!B14)
+    - Indata!B61: 'Byggnadskreditivränta' → 'Aktuell räntenivå' (speglar
+      nuvarande ränteläge, inte specifik byggkreditiv-produkt)
+    - Indata!B62: 'Långsiktig ränta' → 'Långsiktig räntenivå' (samma som
+      Finansiering!B14, vad räntan räknas upp till över ~10 år)
+    - Finansiering!B14: 'Räntenivå' → 'Långsiktig räntenivå' (konsistens)
     - Lönsamhetskontroll!B26: 'Avskrivnings-%' → 'Avskrivningstakt'
     """
     renames = [
         ("Indata", "B18", "Avskrivnings-% per år", "Avskrivningstakt"),
-        ("Indata", "B62", "Långsiktig ränta", "Räntenivå"),
+        ("Indata", "B61", "Byggnadskreditivränta", "Aktuell räntenivå"),
+        ("Indata", "B62", "Långsiktig ränta", "Långsiktig räntenivå"),
+        # Idempotens: om en tidigare körning satt 'Räntenivå', uppdatera den också
+        ("Indata", "B62", "Räntenivå", "Långsiktig räntenivå"),
+        ("Finansiering", "B14", "Räntenivå", "Långsiktig räntenivå"),
         ("Lönsamhetskontroll", "B26", "Avskrivnings-%", "Avskrivningstakt"),
     ]
     n = 0
@@ -870,7 +878,7 @@ def round_t_forsattsblad(wb: Workbook) -> int:
     _section(58, "Finansieringsantaganden")
 
     fin_rows = [
-        ("Räntenivå (långsiktig)", "=Indata!C62", FMT_PCT2, "Belåningsgrad", "=Indata!C64", FMT_PCT1),
+        ("Långsiktig räntenivå", "=Indata!C62", FMT_PCT2, "Belåningsgrad", "=Indata!C64", FMT_PCT1),
         ("Amortering",             "=Indata!C63", FMT_PCT2, "Avkastningskrav eget kapital", "=Indata!C65", FMT_PCT2),
     ]
     for i, (l1, v1, f1, l2, v2, f2) in enumerate(fin_rows):
@@ -1735,6 +1743,191 @@ def round_w_forsattsblad(wb: Workbook) -> int:
     return 1
 
 
+def round_z_resultat_utfall(wb: Workbook) -> int:
+    """Round Z: Utfall vid bindande kravhyra — block på Resultat-fliken.
+
+    Visar (även när NPV blir dimensionerande) vilka värden krav 2 (IRR EK)
+    och krav 3 (MV vs BV) faktiskt landar på vid bindande kravhyran.
+    Speglar LM 371:s upplägg — beslutsfattaren ser direkt om de
+    icke-bindande kraven är välfodrade eller nära gränsen.
+
+    Refererar färdigberäknade celler på Lönsamhetskontroll, ingen ny
+    räknemekanik.
+    """
+    from tools.theme import INK, MUTED, ACCENT, SURFACE, RULE, FAMILY, FMT_KR, FMT_PCT2
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    ws = wb["Resultat"]
+    start = 33  # efter Fördelning per hus-tabellen (slutar på rad 30)
+
+    # ── Sektion-header ───────────────────────────────────────────────────────
+    ws.cell(start, 2).value = "UTFALL VID BINDANDE KRAVHYRA"
+    ws.cell(start, 2).font = Font(name="Segoe UI Semibold", size=11, color=INK, bold=True)
+    ws.cell(start, 2).alignment = Alignment(horizontal="left", vertical="bottom")
+    try:
+        ws.merge_cells(start_row=start, end_row=start, start_column=2, end_column=6)
+    except Exception:
+        pass
+    for c in range(2, 7):
+        ws.cell(start, c).border = Border(bottom=Side(style="thin", color=INK))
+    ws.row_dimensions[start].height = 26
+
+    intro = (
+        "Vid mål-utfall (bindande kravhyra D14): hur välfodrade är de icke-bindande "
+        "kraven? Värden < 0 eller IRR < kravet betyder att projektet inte uppfyller "
+        "kravet vid denna hyra."
+    )
+    ws.cell(start + 1, 2).value = intro
+    ws.cell(start + 1, 2).font = Font(name=FAMILY, size=9, color=MUTED, italic=True)
+    ws.cell(start + 1, 2).alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    try:
+        ws.merge_cells(start_row=start + 1, end_row=start + 1, start_column=2, end_column=6)
+    except Exception:
+        pass
+    ws.row_dimensions[start + 1].height = 32
+
+    # ── Datarader ────────────────────────────────────────────────────────────
+    # (label, value_formula, value_fmt, suffix_label, suffix_formula, status_formula)
+    # Format för NPV som visar "0 kr" istället för "–" vid bindande NPV
+    FMT_KR_EXPLICIT = '#,##0" kr";-#,##0" kr";"0 kr"'
+
+    rows = [
+        ("NPV (krav 1)",
+         "=Lönsamhetskontroll!C9", FMT_KR_EXPLICIT,
+         "", "", "=Lönsamhetskontroll!D9"),
+        ("Faktisk IRR EK (krav 2)",
+         "=Lönsamhetskontroll!C45", "0.00%",
+         "Krav", "=Indata!C65", "=Lönsamhetskontroll!D45"),
+        ("Marginal IRR mot krav",
+         "=Lönsamhetskontroll!C47*100", '+0.00" pp";-0.00" pp";0.00" pp"',
+         "", "", ""),
+        ("Marknadsvärde år 20 (krav 3)",
+         "=Lönsamhetskontroll!C29", FMT_KR,
+         "BV år 20", "=Lönsamhetskontroll!C27", ""),
+        ("Differens MV − BV",
+         "=Lönsamhetskontroll!C30", FMT_KR,
+         "", "", "=Lönsamhetskontroll!D30"),
+    ]
+
+    data_start = start + 3
+    surface_fill = PatternFill("solid", fgColor=SURFACE)
+
+    for i, (label, val, fmt, suf_lbl, suf_val, status) in enumerate(rows):
+        r = data_start + i
+
+        # B: label
+        ws.cell(r, 2).value = label
+        ws.cell(r, 2).font = Font(name=FAMILY, size=10, color=INK)
+        ws.cell(r, 2).alignment = Alignment(horizontal="left", vertical="center")
+
+        # C: value
+        ws.cell(r, 3).value = val
+        ws.cell(r, 3).font = Font(name="Segoe UI Semibold", size=11, color=INK, bold=True)
+        ws.cell(r, 3).number_format = fmt
+        ws.cell(r, 3).alignment = Alignment(horizontal="right", vertical="center", indent=1)
+        ws.cell(r, 3).fill = surface_fill
+
+        # D: suffix label (e.g. "Krav", "BV år 20")
+        if suf_lbl:
+            ws.cell(r, 4).value = suf_lbl
+            ws.cell(r, 4).font = Font(name=FAMILY, size=9, color=MUTED, italic=True)
+            ws.cell(r, 4).alignment = Alignment(horizontal="right", vertical="center")
+
+        # E: suffix value
+        if suf_val:
+            ws.cell(r, 5).value = suf_val
+            ws.cell(r, 5).font = Font(name=FAMILY, size=10, color=MUTED)
+            ws.cell(r, 5).number_format = fmt
+            ws.cell(r, 5).alignment = Alignment(horizontal="right", vertical="center", indent=1)
+
+        # F: status pill
+        if status:
+            ws.cell(r, 6).value = status
+            ws.cell(r, 6).font = Font(name=FAMILY, size=10, color=INK)
+            ws.cell(r, 6).alignment = Alignment(horizontal="left", vertical="center", indent=1)
+
+        ws.row_dimensions[r].height = 22
+
+    # Uppdatera print_area
+    last_row = data_start + len(rows)
+    ws.print_area = f"A1:F{last_row}"
+
+    return len(rows)
+
+
+def round_y_indata_beskrivningar(wb: Workbook) -> int:
+    """Round Y: Komplettera Indata sektion 6-9 med beskrivningstexter i E-kolumn.
+
+    Följer samma mönster som befintliga rader i sektion 1-5 (italic muted
+    text i kolumn E). Sektion 9 får också en intro-rad ovanför
+    investeringsgraden som förklarar kalibreringsmekaniken.
+    """
+    from tools.theme import MUTED, FAMILY
+    from openpyxl.styles import Font, Alignment
+
+    ws = wb["Indata"]
+    n = 0
+
+    desc_font = Font(name=FAMILY, size=9, color=MUTED, italic=True)
+    # Ingen wrap_text — låt texten flöda horisontellt över tomma F-R celler,
+    # samma mönster som befintliga beskrivningar i sektion 1-5
+    desc_align = Alignment(horizontal="left", vertical="center")
+
+    descriptions = {
+        # Sektion 6 — Övriga poster
+        54: "Andel av taxeringsvärdet. 0 för verksamhet med skatteundantag (skola, vård, kommunal förvaltning).",
+        55: "Skatteverkets beslutade taxeringsvärde. Bas för fastighetsskatten.",
+        56: "Årlig avgäld om fastigheten står på kommunal tomträtt. 0 om friköpt mark.",
+        # Sektion 7 — Finansiering
+        61: "Nuvarande marknadsränta. Används för räntekostnad under byggtid och tidiga driftår.",
+        62: "Genomsnittlig ränta efter ~10 år. Finansieringsfliken räknar upp aktuell nivå linjärt till denna.",
+        63: "Årlig amorteringstakt som procent av låneskulden.",
+        # Sektion 9 — Restvärdesbedömning
+        80: "Summa av de fyra parametrarnas effekt. Adderas till extern direktavkastning.",
+    }
+
+    for r, text in descriptions.items():
+        cell = ws.cell(r, 5)  # E-kolumn
+        if cell.value in (None, ""):
+            cell.value = text
+            cell.font = desc_font
+            cell.alignment = desc_align
+            n += 1
+
+    # ── Sektion 9 intro-text på rad 71 (mellan header och investeringsgrad) ──
+    intro = (
+        "Yielden från extern värdering (befintlig fastighet) eller "
+        "jämförelseobjekt (nybyggnation) finkalibreras nedan utifrån "
+        "fyra projektspecifika faktorer. Investeringsgraden vägleder när "
+        "kalibrering är meningsfull — extern värdering är pre-investering "
+        "och fångar inte tunga ombyggnader."
+    )
+    ws["B71"] = intro
+    ws["B71"].font = desc_font
+    ws["B71"].alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    try:
+        ws.merge_cells("B71:R71")
+    except Exception:
+        pass
+    ws.row_dimensions[71].height = 36
+    n += 1
+
+    # ── Komplettera investeringsgrad-raden med beräknings-uttryck ────────────
+    # E72 har redan dynamisk kategoriseringstext. Lägg till statisk
+    # beräknings-not på rad 73 (mellan investeringsgrad och tabellrubrik).
+    ws["B73"] = "Beräkning: ny investering / (befintligt bokfört värde + ny investering)"
+    ws["B73"].font = desc_font
+    ws["B73"].alignment = Alignment(horizontal="left", vertical="center")
+    try:
+        ws.merge_cells("B73:R73")
+    except Exception:
+        pass
+    ws.row_dimensions[73].height = 18
+    n += 1
+
+    return n
+
+
 def round_x_kanslighet(wb: Workbook) -> int:
     """Round X: Känslighetstabell för restvärdesbedömning.
 
@@ -1864,11 +2057,11 @@ def round_x_kanslighet(wb: Workbook) -> int:
 
     rows = []
 
-    # Yield-justering (pp)
+    # Yield-justering (pp) — multiplicera med 100 så formatet visar "−1.00 pp"
     rows.append((
         "Yield-justering",
-        {"C": "=-0.01", "D": "=Indata!D80", "E": "=0.01"},
-        '+0.00"pp";-0.00"pp";0.00"pp"',
+        {"C": "=-1", "D": "=Indata!D80*100", "E": "=1"},
+        '+0.00" pp";-0.00" pp";0.00" pp"',
         False,
     ))
     # Justerad direktavkastning
@@ -2110,6 +2303,14 @@ def main() -> int:
 
     print("8q. Round X: Känslighetstabell — restvärdesbedömning")
     n = round_x_kanslighet(wb)
+    print(f"    {n} rader byggda")
+
+    print("8r. Round Y: Indata-beskrivningar (sektion 6-9)")
+    n = round_y_indata_beskrivningar(wb)
+    print(f"    {n} beskrivningar tillagda")
+
+    print("8s. Round Z: Resultat — utfall vid bindande kravhyra")
+    n = round_z_resultat_utfall(wb)
     print(f"    {n} rader byggda")
 
     print(f"\n9. Sparar → {out.name}")
