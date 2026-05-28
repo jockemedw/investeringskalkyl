@@ -63,12 +63,15 @@ För ny §10-uppgift: lägg till `round_X_*(wb)` i [build/iter9.py](build/iter9.
 
 Status (senaste rad = överst):
 
+- [x] Round X: känslighetstabell restvärdesbedömning (Lönsamhetskontroll rad 73+, opt/bedömt/pess × kravhyror + MV)
+- [x] Round W: restvärdeskalibrering (Indata sektion 9 yield-justering, Beräkningslogik-guide, Försättsblad-status)
+- [x] Round T-V: Försättsblad + Översikt v2 + Indata polish (commit 515e59b)
 - [x] Round H: finansmodell-styling (XLSX-skill-standard, commit 11c9fe1)
 - [x] Round G: Översikt om till beslutsdokument (commit 3073d1b)
 - [x] Round F: designcleanup Lönsamhetskontroll via outline grouping (commit 59f194b)
 - [x] Round C: Indata-fält renamning — branschterminologi
 - [x] Round E: "År N" → "år 20" (commit c423d5e)
 - [x] Round B: pedagogisk omskrivning Beräkningslogik (commit dab830b)
-- [ ] **NÄSTA:** Full design review — kör `/xlsx-review build/iter9.xlsx` (eller senaste iter), använd rapporten som underlag för ev. ytterligare rounds
+- [ ] Faktisk IRR EK per scenario i känslighetstabellen — kräver full EK-cashflow-rekonstruktion för opt/pess (icke-trivialt, ej börjat)
 
 Joakim väljer ordning. Inga uppgifter blockerar varandra.

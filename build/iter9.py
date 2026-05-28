@@ -1401,6 +1401,616 @@ def round_u_oversikt_v2(wb: Workbook) -> int:
     return 1
 
 
+def round_w_restvardesbedomning(wb: Workbook) -> int:
+    """Round W: Restvärdesbedömning — yield-justering ovanpå Gordon-modellen.
+
+    Adderar Indata sektion 9 med:
+    - Investeringsgrad-prompt (auto-beräknad, vägleder när justering är meningsfull)
+    - 4 dropdowns (Läge / Vakansrisk / Lokalflexibilitet / Byggnadsteknisk standard)
+      med 5-gradig skala (±0,25 pp per steg)
+    - Motiveringskolumn (fritext)
+    - Justerad direktavkastning som referenseras från krav 2+3
+
+    Default = Neutralt på alla fyra → exakt baseline-värden bevaras
+    (regressionssäkert mot iter8/iter9).
+
+    Patchar Beräkningslogik C116, C137, C202, C203 + display-celler så
+    Gordon-modellen använder justerad yield konsekvent.
+    """
+    from tools.theme import INK, MUTED, SURFACE, ACCENT, RULE, FAMILY, FMT_PCT2
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.worksheet.datavalidation import DataValidation
+
+    ws = wb["Indata"]
+    n = 0
+
+    # ── Sektion-header rad 70 ───────────────────────────────────────────────
+    ws["B70"] = "9. RESTVÄRDESBEDÖMNING"
+    ws["B70"].font = Font(name="Segoe UI Semibold", size=10, color=INK, bold=True)
+    ws["B70"].fill = PatternFill(fill_type=None)
+    ws["B70"].alignment = Alignment(horizontal="left", vertical="bottom")
+    for c in range(2, 19):
+        ws.cell(70, c).border = Border(bottom=Side(style="thin", color=INK))
+    ws.row_dimensions[70].height = 24
+
+    # ── Investeringsgrad-prompt rad 72 ──────────────────────────────────────
+    ws["B72"] = "Investeringsgrad"
+    ws["B72"].font = Font(name=FAMILY, size=10, color=INK)
+    ws["B72"].alignment = Alignment(horizontal="left", vertical="center")
+
+    ws["C72"] = "=IFERROR(R31/(C57+C58+R31),0)"
+    ws["C72"].font = Font(name=FAMILY, size=10, color=INK)
+    ws["C72"].alignment = Alignment(horizontal="right", vertical="center", indent=1)
+    ws["C72"].number_format = "0.0%"
+    ws["C72"].fill = PatternFill("solid", fgColor=SURFACE)
+
+    # D72: ingen separat enhet — number_format på C72 visar redan %
+
+    ws["E72"] = (
+        '=IF(C72<0.2,"Befintlig fastighet — extern värdering fångar objektet, '
+        'justering ej rekommenderad",'
+        'IF(C72<0.6,"Större ombyggnad — värderingen är delvis pre-investering, '
+        'kalibrering kan vara motiverad",'
+        '"Nybyggnation/motsvarande omfattning — kalibrera mot jämförelseobjekt"))'
+    )
+    ws["E72"].font = Font(name=FAMILY, size=9, color=MUTED, italic=True)
+    ws["E72"].alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    ws.merge_cells("E72:R72")
+    ws.row_dimensions[72].height = 28
+    n += 1
+
+    # ── Tabellrubrik rad 74 ─────────────────────────────────────────────────
+    headers = [(2, "Parameter"), (3, "Bedömning"), (4, "Effekt"), (5, "Motivering")]
+    for col, txt in headers:
+        cell = ws.cell(74, col)
+        cell.value = txt
+        cell.font = Font(name="Segoe UI Semibold", size=9, color=MUTED, bold=True)
+        cell.border = Border(bottom=Side(style="thin", color=RULE))
+        cell.alignment = Alignment(
+            horizontal="right" if col in (3, 4) else "left",
+            vertical="bottom",
+        )
+    ws.merge_cells("E74:R74")
+    ws.row_dimensions[74].height = 20
+
+    # ── 4 dropdowns rad 75-78 ───────────────────────────────────────────────
+    params = [
+        ("Läge (centralitet, infrastruktur)",
+         "Närhet till kollektivtrafik, serviceunderlag, demografi"),
+        ("Långsiktig vakansrisk",
+         "Hyresgästens beroende, alternativa hyresgäster, demografi"),
+        ("Lokalflexibilitet (omställbarhet)",
+         "Planlösning, bjälklagshöjd, bärande konstruktion"),
+        ("Byggnadsteknisk standard",
+         "Stomme, klimatskal, installationer, energiprestanda"),
+    ]
+
+    dv = DataValidation(
+        type="list",
+        formula1='"Mycket positivt,Något positivt,Neutralt,Något negativt,Mycket negativt"',
+        allow_blank=False,
+    )
+    dv.error = "Välj från listan"
+    dv.errorTitle = "Ogiltigt val"
+    dv.prompt = "Bedömning av denna parameter"
+    dv.promptTitle = "Restvärdesfaktor"
+    ws.add_data_validation(dv)
+
+    for i, (label, hint) in enumerate(params):
+        r = 75 + i
+
+        # Parameter-etikett
+        ws.cell(r, 2).value = label
+        ws.cell(r, 2).font = Font(name=FAMILY, size=10, color=INK)
+        ws.cell(r, 2).alignment = Alignment(horizontal="left", vertical="center")
+
+        # Dropdown
+        dropdown = ws.cell(r, 3)
+        dropdown.value = "Neutralt"
+        dropdown.font = Font(name=FAMILY, size=10, color=INK)
+        dropdown.alignment = Alignment(horizontal="center", vertical="center")
+        dropdown.fill = PatternFill("solid", fgColor=SURFACE)
+        dv.add(dropdown)
+
+        # Effekt (formel)
+        effekt = ws.cell(r, 4)
+        effekt.value = (
+            f'=IF(C{r}="Mycket positivt",-0.005,'
+            f'IF(C{r}="Något positivt",-0.0025,'
+            f'IF(C{r}="Något negativt",0.0025,'
+            f'IF(C{r}="Mycket negativt",0.005,0))))'
+        )
+        effekt.font = Font(name=FAMILY, size=10, color=INK)
+        effekt.number_format = '+0.00%;-0.00%;0.00%'
+        effekt.alignment = Alignment(horizontal="right", vertical="center", indent=1)
+
+        # Motivering (fritext + hint)
+        motiv = ws.cell(r, 5)
+        motiv.value = ""
+        motiv.font = Font(name=FAMILY, size=9, color=INK)
+        motiv.alignment = Alignment(horizontal="left", vertical="center",
+                                    wrap_text=True, indent=1)
+        motiv.fill = PatternFill("solid", fgColor=SURFACE)
+
+        # Hint i kolumn F-R (muted, italic) — visar bedömningsgrunden
+        ws.cell(r, 6).value = hint
+        ws.cell(r, 6).font = Font(name=FAMILY, size=8, color=MUTED, italic=True)
+        ws.cell(r, 6).alignment = Alignment(horizontal="left", vertical="center")
+        ws.merge_cells(start_row=r, end_row=r, start_column=5, end_column=5)
+        ws.merge_cells(start_row=r, end_row=r, start_column=6, end_column=18)
+
+        ws.row_dimensions[r].height = 22
+        n += 1
+
+    # ── Total + yield_adj rad 80-81 ─────────────────────────────────────────
+    # Tunn rule ovanför summa
+    for col in range(2, 6):
+        ws.cell(80, col).border = Border(top=Side(style="thin", color=INK))
+
+    ws["B80"] = "Total justering av yield"
+    ws["B80"].font = Font(name="Segoe UI Semibold", size=10, color=INK, bold=True)
+    ws["B80"].alignment = Alignment(horizontal="left", vertical="center")
+
+    ws["D80"] = "=SUM(D75:D78)"
+    ws["D80"].font = Font(name="Segoe UI Semibold", size=10, color=INK, bold=True)
+    ws["D80"].number_format = '+0.00%;-0.00%;0.00%'
+    ws["D80"].alignment = Alignment(horizontal="right", vertical="center", indent=1)
+    ws.row_dimensions[80].height = 24
+
+    ws["B81"] = "Justerad direktavkastning"
+    ws["B81"].font = Font(name="Segoe UI Semibold", size=10, color=ACCENT, bold=True)
+    ws["B81"].alignment = Alignment(horizontal="left", vertical="center")
+
+    ws["D81"] = "=C6+D80"
+    ws["D81"].font = Font(name="Segoe UI Semibold", size=11, color=ACCENT, bold=True)
+    ws["D81"].number_format = FMT_PCT2
+    ws["D81"].alignment = Alignment(horizontal="right", vertical="center", indent=1)
+
+    ws["E81"] = "Används i krav 2 (exit-värde) och krav 3 (MV ≥ BV år 20)"
+    ws["E81"].font = Font(name=FAMILY, size=9, color=MUTED, italic=True)
+    ws["E81"].alignment = Alignment(horizontal="left", vertical="center")
+    ws.merge_cells("E81:R81")
+    ws.row_dimensions[81].height = 26
+    n += 1
+
+    # ── Uppdatera print_area så sektion 9 inkluderas (round_i körs före round_w) ─
+    ws.print_area = "A1:R81"
+
+    # ── Patcha yield-refs i Beräkningslogik + Lönsamhetskontroll + Försättsblad ─
+    yield_ref = "Indata!$D$81"
+
+    patches = [
+        ("Beräkningslogik", "C116"),
+        ("Beräkningslogik", "C137"),
+        ("Beräkningslogik", "C202"),
+        ("Beräkningslogik", "C203"),
+        ("Lönsamhetskontroll", "C24"),
+        ("Försättsblad", "C48"),
+    ]
+    for sheet, coord in patches:
+        if sheet not in wb.sheetnames:
+            continue
+        cell = wb[sheet][coord]
+        if isinstance(cell.value, str) and cell.value.startswith("="):
+            new_formula = cell.value.replace("Indata!C6", yield_ref)
+            if new_formula != cell.value:
+                cell.value = new_formula
+                n += 1
+
+    # Block D + E (krav 2 IRR EK): rad 172 (exit-värde 0 hyra) och 187 (exit-värde 1Mkr)
+    # Kolumnerna D:AB är år 1-25 — varje kolumn har egen formel med Indata!$C$6
+    blk = wb["Beräkningslogik"]
+    from openpyxl.utils import get_column_letter
+    for r in (172, 187):
+        for col_idx in range(4, 29):  # D..AB
+            coord = f"{get_column_letter(col_idx)}{r}"
+            cell = blk[coord]
+            if isinstance(cell.value, str) and "Indata!$C$6" in cell.value:
+                cell.value = cell.value.replace("Indata!$C$6", "Indata!$D$81")
+                n += 1
+
+    return n
+
+
+def round_w_guide(wb: Workbook) -> int:
+    """Round W (forts): Restvärdesguide i Beräkningslogik.
+
+    Pedagogiskt textavsnitt som förklarar de sex resonemangen för restvärde
+    och varför Gordon med yield-kalibrering är valt. Adderas efter sista
+    befintliga block. Refererar Indata sektion 9 för kalibreringsmekaniken.
+    """
+    from tools.theme import INK, MUTED, ACCENT, FAMILY
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
+    ws = wb["Beräkningslogik"]
+    start = ws.max_row + 3  # två tomma rader marginal
+
+    # Header
+    ws.cell(start, 2).value = "RESTVÄRDETS LOGIK — RESONEMANG OCH KALIBRERING"
+    ws.cell(start, 2).font = Font(name="Segoe UI Semibold", size=11, color=INK, bold=True)
+    ws.cell(start, 2).alignment = Alignment(horizontal="left", vertical="bottom")
+    for c in range(2, 31):
+        ws.cell(start, c).border = Border(bottom=Side(style="thin", color=INK))
+    ws.row_dimensions[start].height = 26
+
+    intro = (
+        "Restvärdet år 20 är ett antagande, inte ett faktum. Det finns flera "
+        "rimliga sätt att resonera om vad fastigheten är värd vid kalkylperiodens slut. "
+        "Mallen använder Gordon-modellen (driftnetto år 21 / direktavkastning) med "
+        "kalibrering via Indata sektion 9. De andra resonemangen nedan är sanity checks "
+        "när Gordon-resultatet ifrågasätts eller behöver kompletteras."
+    )
+    ws.cell(start + 2, 2).value = intro
+    ws.cell(start + 2, 2).font = Font(name=FAMILY, size=10, color=INK)
+    ws.cell(start + 2, 2).alignment = Alignment(horizontal="left", vertical="top",
+                                                wrap_text=True)
+    ws.merge_cells(start_row=start + 2, end_row=start + 2,
+                   start_column=2, end_column=18)
+    ws.row_dimensions[start + 2].height = 60
+
+    resonemang = [
+        ("1. Gordon — kapitaliserad evig driftnetto (modellens default)",
+         "Driftnetto år 21 / justerad direktavkastning. Antar att fastigheten kan "
+         "drivas vidare evigt och säljas till marknadsmässig avkastning. Den extern "
+         "yielden (Indata C6) kommer från värdering (befintlig fastighet) eller "
+         "jämförelseobjekt (nybyggnation). Yield-justeringen i sektion 9 kalibrerar "
+         "objektets långsiktiga värdebeständighet mot snittet."),
+        ("2. Avskrivet bokfört värde",
+         "Anskaffning minus ackumulerade avskrivningar. Försiktigt — speglar inte "
+         "marknad, bara redovisning. Användbart som golv eller sanity check, inte "
+         "som primärt exit-värde. LM 371 viktade 60% mot detta — borttaget iter 7."),
+        ("3. Restproduktionsvärde",
+         "Vad kostar det att uppföra motsvarande byggnad år 20, med hänsyn till "
+         "kvarvarande teknisk livslängd. Frikopplar från driftnetto. Underskattar "
+         "ofta läges- och kontraktsvärde."),
+        ("4. Mark + nedskriven byggnad",
+         "Markvärde plus byggnad till lågt restvärde. Pessimistiskt scenario — "
+         "antar att byggnaden närmar sig slutet av sin ekonomiska livslängd. "
+         "Lämpligt för specialbyggnader med svag omställbarhet."),
+        ("5. Förhandlat övertagandevärde",
+         "Kommunen eller offentlig hyresgäst löser ut fastigheten år 20 till "
+         "förhandlat pris (ofta bokfört värde). Specialfall där exit till privat "
+         "marknad inte är planerad."),
+        ("6. Likvidations- eller rivningsvärde",
+         "Markvärde minus rivningskostnad. Värsta fall, golv för känslighetsanalys."),
+    ]
+
+    row = start + 4
+    for title, body in resonemang:
+        ws.cell(row, 2).value = title
+        ws.cell(row, 2).font = Font(name="Segoe UI Semibold", size=10, color=ACCENT, bold=True)
+        ws.cell(row, 2).alignment = Alignment(horizontal="left", vertical="bottom")
+        ws.merge_cells(start_row=row, end_row=row, start_column=2, end_column=18)
+        ws.row_dimensions[row].height = 20
+
+        ws.cell(row + 1, 2).value = body
+        ws.cell(row + 1, 2).font = Font(name=FAMILY, size=10, color=INK)
+        ws.cell(row + 1, 2).alignment = Alignment(horizontal="left", vertical="top",
+                                                  wrap_text=True)
+        ws.merge_cells(start_row=row + 1, end_row=row + 1,
+                       start_column=2, end_column=18)
+        ws.row_dimensions[row + 1].height = 56
+
+        row += 3
+
+    # Uppdatera print_area så guiden inkluderas
+    from openpyxl.utils import get_column_letter
+    last_col = min(30, ws.max_column)
+    ws.print_area = f"A1:{get_column_letter(last_col)}{row}"
+
+    return 1
+
+
+def round_w_forsattsblad(wb: Workbook) -> int:
+    """Round W (forts): Yield-justering på Försättsblad — Kontroll restvärde.
+
+    Lägger en rad i Kontroll restvärde-sektionen (rad 69) som visar
+    aktuell yield-justering — gör det tydligt på memo-fliken att Gordon
+    kalibrerats (eller är neutral).
+    """
+    from tools.theme import INK, MUTED, ACCENT, FAMILY, FMT_KR
+    from openpyxl.styles import Font, Alignment
+
+    if "Försättsblad" not in wb.sheetnames:
+        return 0
+
+    ws = wb["Försättsblad"]
+
+    # Befintlig "Kontroll restvärde"-sektion: rad 69 (header), 70-72 (data).
+    # Vi använder rad 73 (var tom buffer) för yield-justeringsraden.
+    ws["B73"] = "Yield-justering (restvärde)"
+    ws["B73"].font = Font(name=FAMILY, size=10, color=MUTED)
+    ws["B73"].alignment = Alignment(horizontal="left", vertical="center")
+
+    ws.merge_cells("C73:E73")
+    ws["C73"] = (
+        '=IF(Indata!D80=0,"Neutral (extern yield rakt av)",'
+        'TEXT(Indata!D80*100,"+0.00;-0.00")&" pp · justerad yield "'
+        '&TEXT(Indata!D81,"0.00%"))'
+    )
+    ws["C73"].font = Font(name=FAMILY, size=10, color=ACCENT, italic=True)
+    ws["C73"].alignment = Alignment(horizontal="right", vertical="center")
+    ws.row_dimensions[73].height = 22
+
+    return 1
+
+
+def round_x_kanslighet(wb: Workbook) -> int:
+    """Round X: Känslighetstabell för restvärdesbedömning.
+
+    Tre scenarier på Lönsamhetskontroll (rad 73+) med:
+    - Yield-justering (pp)
+    - Justerad direktavkastning
+    - Bindande kravhyra (analytisk via MAX av tre krav)
+    - Bindande krav (NPV/IRR/MV)
+    - Marknadsvärde år 20
+    - Differens MV − BV
+
+    Faktisk IRR EK visas endast för bedömt scenario (kräver full
+    EK-cashflow-rekonstruktion för opt/pess som inte är analytiskt
+    görbart i ren formel).
+
+    Yields per scenario:
+      Optimistisk: extern yield − 1,00 pp
+      Bedömt: justerad yield (Indata!D81, från sektion 9)
+      Pessimistisk: extern yield + 1,00 pp
+    """
+    from tools.theme import INK, MUTED, ACCENT, SURFACE, RULE, FAMILY, FMT_KR, FMT_PCT2
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    ws = wb["Lönsamhetskontroll"]
+    start = 73  # efter befintliga sektioner
+
+    # ── Header rad 73 ───────────────────────────────────────────────────────
+    ws.cell(start, 2).value = "KÄNSLIGHETSANALYS — RESTVÄRDESBEDÖMNING"
+    ws.cell(start, 2).font = Font(name="Segoe UI Semibold", size=11, color=INK, bold=True)
+    ws.cell(start, 2).alignment = Alignment(horizontal="left", vertical="bottom")
+    try:
+        ws.merge_cells(start_row=start, end_row=start, start_column=2, end_column=7)
+    except Exception:
+        pass
+    for c in range(2, 8):
+        ws.cell(start, c).border = Border(bottom=Side(style="thin", color=INK))
+    ws.row_dimensions[start].height = 26
+
+    # Intro
+    ws.cell(start + 1, 2).value = (
+        "Hur ändras bindande kravhyra och marknadsvärde om yielden slår "
+        "±1,00 pp jämfört med basbedömningen? Bedömt scenario = justeringen "
+        "från Indata sektion 9."
+    )
+    ws.cell(start + 1, 2).font = Font(name=FAMILY, size=10, color=MUTED, italic=True)
+    ws.cell(start + 1, 2).alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    try:
+        ws.merge_cells(start_row=start + 1, end_row=start + 1, start_column=2, end_column=7)
+    except Exception:
+        pass
+    ws.row_dimensions[start + 1].height = 32
+
+    # ── Scenario-header rad 75 ──────────────────────────────────────────────
+    hdr = start + 2
+    headers = [(3, "Optimistisk"), (4, "Bedömt"), (5, "Pessimistisk")]
+    for col, txt in headers:
+        cell = ws.cell(hdr, col)
+        cell.value = txt
+        cell.font = Font(name="Segoe UI Semibold", size=10, color=INK, bold=True)
+        cell.alignment = Alignment(horizontal="center", vertical="bottom")
+        cell.border = Border(bottom=Side(style="thin", color=INK))
+    # Underrubrik
+    ws.cell(hdr + 1, 3).value = "yield − 1,00 pp"
+    ws.cell(hdr + 1, 4).value = "Indata sektion 9"
+    ws.cell(hdr + 1, 5).value = "yield + 1,00 pp"
+    for col in (3, 4, 5):
+        ws.cell(hdr + 1, col).font = Font(name=FAMILY, size=9, color=MUTED, italic=True)
+        ws.cell(hdr + 1, col).alignment = Alignment(horizontal="center", vertical="top")
+    ws.row_dimensions[hdr].height = 22
+    ws.row_dimensions[hdr + 1].height = 18
+
+    # ── Datarader 77+ ───────────────────────────────────────────────────────
+    # Yield-referenser per scenario
+    yields = {
+        "C": "(Indata!$C$6-0.01)",       # Optimistisk
+        "D": "Indata!$D$81",              # Bedömt
+        "E": "(Indata!$C$6+0.01)",       # Pessimistisk
+    }
+
+    def scenario_formula(template: str, col: str) -> str:
+        """Substituera {Y} med yield-referens för scenariot."""
+        return template.replace("{Y}", yields[col])
+
+    # Rad-definitioner: (label, template_or_callable, fmt, bold, hint)
+    # Konstanter från Beräkningslogik:
+    #   C115 = PV driftnetto vid 0 hyra (yield-oberoende)
+    #   C118 = PV investering (yield-oberoende)
+    #   C136 = PV driftnetto vid 1 Mkr hyra (yield-oberoende)
+    #   C177 = NPV EK vid 0 hyra (vid nuvarande D81)
+    #   C192 = NPV EK vid 1 Mkr hyra (vid nuvarande D81)
+    #   C199 = Driftnetto år 21 vid 0 hyra
+    #   C200 = Driftnetto år 21 vid 1 Mkr hyra
+    #   C204 = Bokfört värde år 20
+
+    # Krav 1: NPV ≥ 0  →  hyra = -NPV_0(y) / b_NPV(y)
+    #   NPV_0(y) = C115 + C199/y/(1+C9)^C16 + C118
+    #   NPV_1(y) = C136 + C200/y/(1+C9)^C16 + C118
+    krav1_template = (
+        "=-(Beräkningslogik!C115+Beräkningslogik!C199/{Y}/(1+Indata!C9)^Indata!C16+Beräkningslogik!C118)"
+        "/((Beräkningslogik!C136-Beräkningslogik!C115+(Beräkningslogik!C200-Beräkningslogik!C199)/{Y}"
+        "/(1+Indata!C9)^Indata!C16)/1000000)"
+    )
+
+    # Krav 3: MV ≥ BV  →  hyra = (BV*y - DN21_0) / ((DN21_1-DN21_0)/1e6)
+    krav3_template = (
+        "=(Beräkningslogik!C204*{Y}-Beräkningslogik!C199)"
+        "*1000000/(Beräkningslogik!C200-Beräkningslogik!C199)"
+    )
+
+    # Krav 2: NPV_EK_0(y) = C177 + DN82_21*(1/y - 1/D81)/(1+C65)^C16
+    #   där DN82_21 = INDEX(Beräkningslogik!D82:AB82, MATCH(C5+C16, Beräkningslogik!D52:AB52,0))
+    #        DN132_21 = INDEX(Beräkningslogik!D132:AB132, MATCH(C5+C16, ...,0))
+    #   krav 2 hyra = -NPV_EK_0(y) / b_IRR(y)
+    dn82_21 = ("INDEX(Beräkningslogik!D82:AB82,MATCH(Indata!C5+Indata!C16,"
+               "Beräkningslogik!D52:AB52,0))")
+    dn132_21 = ("INDEX(Beräkningslogik!D132:AB132,MATCH(Indata!C5+Indata!C16,"
+                "Beräkningslogik!D52:AB52,0))")
+    disc_ek = "(1+Indata!C65)^Indata!C16"
+    npv_ek_0 = (f"(Beräkningslogik!C177+{dn82_21}*(1/{{Y}}-1/Indata!$D$81)/{disc_ek})")
+    npv_ek_1 = (f"(Beräkningslogik!C192+{dn132_21}*(1/{{Y}}-1/Indata!$D$81)/{disc_ek})")
+    krav2_template = f"=-{npv_ek_0}/(({npv_ek_1}-{npv_ek_0})/1000000)"
+
+    # MV år 20 vid bindande kravhyra:
+    #   MV = (DN21_0 + b_DN21 * h_bind) / y
+    #   där b_DN21 = (C200-C199)/1e6
+    #   h_bind = scenariots egna bindande hyra (referensera C{row} där bindande står)
+
+    rows = []
+
+    # Yield-justering (pp)
+    rows.append((
+        "Yield-justering",
+        {"C": "=-0.01", "D": "=Indata!D80", "E": "=0.01"},
+        '+0.00"pp";-0.00"pp";0.00"pp"',
+        False,
+    ))
+    # Justerad direktavkastning
+    rows.append((
+        "Justerad direktavkastning",
+        {col: f"={yields[col]}" for col in "CDE"},
+        FMT_PCT2,
+        False,
+    ))
+    # Krav 1 — bedömt = Resultat!D10 (exakt), opt/pess = analytisk
+    rows.append((
+        "Kravhyra NPV ≥ 0",
+        {
+            "C": scenario_formula(krav1_template, "C"),
+            "D": "=Resultat!D10",
+            "E": scenario_formula(krav1_template, "E"),
+        },
+        '#,##0',
+        False,
+    ))
+    # Krav 2 — bedömt = Resultat!D11 (exakt), opt/pess = analytisk
+    rows.append((
+        "Kravhyra IRR ≥ avk.krav",
+        {
+            "C": scenario_formula(krav2_template, "C"),
+            "D": "=Resultat!D11",
+            "E": scenario_formula(krav2_template, "E"),
+        },
+        '#,##0',
+        False,
+    ))
+    # Krav 3 — bedömt = Resultat!D12 (exakt), opt/pess = analytisk
+    rows.append((
+        "Kravhyra MV ≥ BV",
+        {
+            "C": scenario_formula(krav3_template, "C"),
+            "D": "=Resultat!D12",
+            "E": scenario_formula(krav3_template, "E"),
+        },
+        '#,##0',
+        False,
+    ))
+    # Bindande kravhyra = MAX
+    data_start = start + 4  # första datarad efter header+intro+scenariorad+underrubrik
+    bind_row = data_start + 5  # = MAX rad (efter 5 ovanstående)
+
+    def bind_max(col):
+        # Refererar de tre föregående raderna i samma kolumn
+        return f"=MAX({col}{data_start+2},{col}{data_start+3},{col}{data_start+4})"
+
+    rows.append((
+        "Bindande kravhyra",
+        {col: bind_max(col) for col in "CDE"},
+        '#,##0',
+        True,
+    ))
+    # Bindande krav (NPV/IRR/MV)
+    def bind_label(col):
+        return (f'=IF({col}{bind_row}={col}{data_start+2},"NPV",'
+                f'IF({col}{bind_row}={col}{data_start+3},"IRR","MV"))')
+    rows.append((
+        "Bindande krav",
+        {col: bind_label(col) for col in "CDE"},
+        None,
+        False,
+    ))
+    # MV år 20 vid bindande kravhyra
+    def mv_formula(col):
+        Y = yields[col]
+        return (f"=(Beräkningslogik!C199+(Beräkningslogik!C200-Beräkningslogik!C199)"
+                f"/1000000*{col}{bind_row})/{Y}")
+    rows.append((
+        "Marknadsvärde år 20",
+        {col: mv_formula(col) for col in "CDE"},
+        '#,##0',
+        False,
+    ))
+    # Differens MV − BV
+    def diff_formula(col):
+        return f"={col}{bind_row + 2}-Beräkningslogik!C204"
+    rows.append((
+        "Differens MV − BV",
+        {col: diff_formula(col) for col in "CDE"},
+        '#,##0',
+        False,
+    ))
+
+    # Skriv ut raderna
+    surface_fill = PatternFill("solid", fgColor=SURFACE)
+    for i, (label, vals, fmt, bold) in enumerate(rows):
+        r = data_start + i
+
+        ws.cell(r, 2).value = label
+        ws.cell(r, 2).font = Font(
+            name="Segoe UI Semibold" if bold else FAMILY,
+            size=10, color=INK, bold=bold)
+        ws.cell(r, 2).alignment = Alignment(horizontal="left", vertical="center")
+
+        for col_letter in "CDE":
+            col_idx = ord(col_letter) - ord("A") + 1
+            cell = ws.cell(r, col_idx)
+            cell.value = vals[col_letter]
+            cell.font = Font(
+                name="Segoe UI Semibold" if bold else FAMILY,
+                size=11 if bold else 10,
+                color=ACCENT if (bold and col_letter == "D") else INK,
+                bold=bold)
+            cell.alignment = Alignment(horizontal="center" if fmt is None else "right",
+                                       vertical="center", indent=1)
+            if fmt is not None:
+                cell.number_format = fmt
+            if col_letter == "D":  # bedömt = highlight
+                cell.fill = surface_fill
+        ws.row_dimensions[r].height = 26 if bold else 22
+
+        # Tunn rule ovanför "Bindande kravhyra"
+        if label == "Bindande kravhyra":
+            for c in range(2, 6):
+                ws.cell(r, c).border = Border(top=Side(style="thin", color=INK))
+
+    # Not om faktisk IRR EK
+    note_row = data_start + len(rows) + 1
+    ws.cell(note_row, 2).value = (
+        "Faktisk IRR EK per scenario kräver full EK-cashflow-rekonstruktion "
+        "och visas inte här. Se Lönsamhetskontroll C45 för bedömt scenario. "
+        "Om krav 2 (IRR) är bindande är IRR EK exakt = avkastningskravet; "
+        "om krav 1 eller 3 är bindande är IRR EK strikt högre än kravet."
+    )
+    ws.cell(note_row, 2).font = Font(name=FAMILY, size=9, color=MUTED, italic=True)
+    ws.cell(note_row, 2).alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    try:
+        ws.merge_cells(start_row=note_row, end_row=note_row, start_column=2, end_column=7)
+    except Exception:
+        pass
+    ws.row_dimensions[note_row].height = 42
+
+    # Print_area utökas
+    ws.print_area = f"A1:G{note_row}"
+
+    return len(rows)
+
+
 def main() -> int:
     out = ROOT / "build" / "iter9.xlsx"
     out.parent.mkdir(exist_ok=True)
@@ -1485,6 +2095,22 @@ def main() -> int:
     print("8m. Round V: Indata styling-polish (enhetlig editorial)")
     n = round_v_indata_polish(wb)
     print(f"    {n} cells uppdaterade")
+
+    print("8n. Round W: Restvärdesbedömning (sektion 9 + yield-patches)")
+    n = round_w_restvardesbedomning(wb)
+    print(f"    {n} celler uppdaterade")
+
+    print("8o. Round W: Restvärdesguide i Beräkningslogik")
+    n = round_w_guide(wb)
+    print(f"    guide skriven")
+
+    print("8p. Round W: Yield-justering på Försättsblad")
+    n = round_w_forsattsblad(wb)
+    print(f"    {n} rad uppdaterad")
+
+    print("8q. Round X: Känslighetstabell — restvärdesbedömning")
+    n = round_x_kanslighet(wb)
+    print(f"    {n} rader byggda")
 
     print(f"\n9. Sparar → {out.name}")
     save_iter(wb, out)
