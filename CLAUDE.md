@@ -64,6 +64,7 @@ För ny §10-uppgift: lägg till `round_X_*(wb)` i [build/iter9.py](build/iter9.
 Status (senaste rad = överst):
 
 - [ ] **NÄSTA:** (öppen — Joakim väljer)
+- [~] Design-pass alla 9 flikar (NIGHTRUN, autonomt): 7 rena, 2 → Joakim. Se [NIGHTRUN.md](NIGHTRUN.md). Öppna defekter som kräver designbeslut: **Översikt** (skrivs ut på 18 sidor pga flytande hero-bild + print_area `B1:F50` klipper högerspalten t.o.m. kol L), **Beräkningslogik** (`########` i tekniska rådata-blockets ~30 årskolumner pga `fitToWidth=2`-komprimering). Båda har diagnos + rekommenderad fix i NIGHTRUN. Meta: `render_local`/`/xlsx-review` opålitligt på flikar med icke-trivial page setup — verifiera med trogen export.
 - [x] Round AE: enhetligt designsystem — eyebrow/H1/H2-harmoni över alla 9 flikar (commit f25bfe7). Nya roller i `tools/theme.py`: `eyebrow`, `h1_display`, `h1_subtitle`, `h2_section`, `h3_sub`, `table_header`. Blå banner-sektioner ersatta med tunn underline-rule.
 - [x] Round Z: Resultat — utfall vid bindande kravhyra (NPV/IRR/MV-status, refererar Lönsamhetskontroll)
 - [x] Round Y: Indata-beskrivningar sektion 6-9 + räntenivå-renamning (Aktuell / Långsiktig)
