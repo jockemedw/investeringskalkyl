@@ -40,9 +40,9 @@ Osäker på om det är defekt → logga, rör inte. Konservativ bias.
 
 | # | Flik | Status | Fix / not |
 |---|------|--------|-----------|
-| 1 | Översikt | ⏳ pågår | — |
-| 2 | Försättsblad | ⬜ kö | — |
-| 3 | Indata | ⬜ kö | — |
+| 1 | Översikt | ⏭️ Joakim | 18-sidors utskrift (hero-bild). Print_area-bugg fixbar, men sidblåsningen = designbeslut. Se "Kräver Joakim". |
+| 2 | Försättsblad | ✅ klar | Ren — sidnav, titel, sektioner sitter snyggt. Ingen åtgärd. |
+| 3 | Indata | ⏳ pågår | — |
 | 4 | Kassaflöde | ⬜ kö | — |
 | 5 | Finansiering | ⬜ kö | — |
 | 6 | Resultat | ⬜ kö | — |
@@ -53,10 +53,21 @@ Osäker på om det är defekt → logga, rör inte. Konservativ bias.
 Status: ⬜ kö · ⏳ pågår · ✅ klar · ⏭️ hoppad (blockerad) · 🟡 fix klar men subjektivt kvar
 
 ## Kräver Joakim (subjektiva beslut jag lät bli)
-_(fylls på under natten)_
+
+### Översikt — skrivs ut på 18 sidor (bör vara ~2)
+**Diagnos (verifierad i riktiga Excel, inte bara render_local):**
+- Fliken har `fitToWidth=1`, `fitToHeight=2`, `fitToPage=True`, landscape, inga manuella sidbrytningar, inga extremt höga rader (radhöjder summerar ~1229 pt ≈ 2 sidor). Med dessa inställningar *borde* den bli ~2 sidor.
+- Ändå exporterar Excel den till **18 sidor** — fit-to-page honoreras inte. Enda kvarvarande orsak: den **flytande hero-bilden** (`Image 1`, ~900×285 pt, ett trätak/interiör-foto) spränger utskriftsutbredningen; Excel skalar inte ned flytande objekt med fit-to-page som det gör med celler.
+- **Separat bugg jag hittade:** print_area var `B1:F50` men layouten har en högerspalt med merges till **kol L** (`B17:L17`, `J21:L21`, `J43:L43` …). Print_area klipper alltså bort hela högerspalten — halva beslutsdokumentets data skrivs aldrig ut.
+- **Jag testade** att bredda print_area till `B1:L50`: det fixar bortklippningen (regression förblev grön) men höjde sidantalet 18→**27** (mer innehåll i den uppskalade arean). Reverterade — vill inte shippa sämre utskrift.
+
+**Beslut du behöver ta (designval, därför lämnat):**
+1. Hero-bilden: behållas, krympas, om-ankras (`oneCellAnchor`), eller tas bort? Den driver sidblåsningen.
+2. När hero-frågan är löst: sätt print_area till full bredd (`B1:L50`) så högerspalten kommer med.
+Misstänkt rotorsak att börja i: `round_u_oversikt_v2` (build/iter9.py ~rad 1398) — satte `fitToHeight=2` men uppdaterade aldrig print_area när högerspalten lades till, och hero-bildens storlek/ankare.
 
 ## Blockerat (regression rött / kunde inte lösa)
-_(fylls på under natten)_
+_(inget än)_
 
 ## Commit-logg
 _(en rad per committad flik)_
