@@ -38,6 +38,24 @@ anteckningar inskrivna som formler. Visas som `#NAME?` i filen idag. v2 lagrar d
 (Upptäcktes av regression_v2:s nollfelsscan — iter9:s regressionstest scannar inte formelfel.)
 Teknisk läxa: openpyxl skriver ALLA strängar som börjar med `=` som formler — även vid fix.
 
+### F-4: Stale radreferenser i Beräkningslogiks pedagogik (objektiv defekt, ny)
+Annoteringarna pekade på "Kassaflöde C70/C90/C91" och "Block A (rad 10–70)" — blocken ligger
+på Beräkningslogik rad 59–204 sedan de flyttades. v2 korrigerar alla sju referenserna.
+Dessutom: headerns merge B46:E46 högg texten vid kolumn E (breddad till K), B35 radhöjd
+klippte wrappad text (43,5 → 60).
+
+### F-5: INFASNING-tabellen på Kassaflöde är död i produktion (objektiv formelbugg, ny)
+Rad 30–34 multiplicerar med `$E$7` = "Area Bef (aktiv) år 2" = 0 → hela tabellen visar 0
+trots att Skola tillträder år 1. Felreferens (avsedd bas är ett kr-flöde — formelns
+index-term bevisar det). v2: objektets andel × faktisk bruttohyra per år (rad 16) med
+tillträdes-flagga; "Andel av fullt flöde" divideras per år. Inget refererar raderna →
+regressionssäkert (verifierat: gate grön).
+
+### F-6: Kassaflödes utskrift trasig i produktion (objektiv, ny — render_local dolde den)
+####### i ALLA årskolumner utom 2026 (kolumn E..AB defaultbredd 8,43 < 8-siffriga belopp)
+och print_area B1:AB156 täckte 120 tomma rader → 6 av 10 sidor blanka. v2: bredd 13,
+print_area B1:W36 (år 21–25 syns på skärm, skrivs inte ut). 10 sidor → 2.
+
 ### F-2: Hero-bilden är rotorsaken till Översikts 18-sidiga utskrift (bekräftar NIGHTRUN)
 Bilden (1786×765 px, OneCellAnchor B1) skalas inte av fit-to-page → sidblåsning.
 
@@ -64,7 +82,7 @@ Recalc: `tools/recalc.py` (Excel COM). Gate: `python build/oneshot/regression_v2
 |-----------|--------|-----|
 | 1. Spec extraherad + designspec | ✅ | spec_iter9.json: 9 flikar, 20 137 celler, 2 469 formler. Ankare verifierade. |
 | 2. Motor (replay) grön | ✅ | Exakt baslinje på första recalc. Nollfelsscan grön (iter9 har 2 #NAME? — fixade i v2, F-3). COM-krångel löst: strö-EXCEL + openpyxl "="-strängfällan. |
-| 3. Design: Översikt om, tkr-fix, Grafer, locale-fix | ⬜ | |
+| 3. Design: Översikt om, tkr-fix, Grafer, locale-fix | ✅ | Översikt 18→1 sida (ny design, statusblock, ingen hero). Beräkningslogik tkr (1242 celler) + F-4-polish. Kassaflöde F-5/F-6 (10→2 sidor). Grafer-flik med 3 diagram. Sidnav 10 poster. |
 | 4. Print: page setup + trogen PDF per flik | ⬜ | |
 | 5. Slutrapport + jämförelse | ⬜ | |
 

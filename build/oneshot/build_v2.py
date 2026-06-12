@@ -220,9 +220,9 @@ def build(no_recalc: bool = False) -> int:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     wb.save(OUT)
 
-    outline_sheets = [i for i, s in enumerate(spec["sheets"])
-                      if any(v["outline"] for v in s["row_heights"].values())]
-    # Grafer m.fl. nya flikar läggs efter spec-flikarna → index stämmer.
+    # Index i wb-ordning (sheetN.xml följer skapandeordningen — Grafer skiftar den)
+    outline_sheets = [i for i, ws in enumerate(wb.worksheets)
+                      if any(rd.outlineLevel for rd in ws.row_dimensions.values())]
     if outline_sheets:
         patch_summary_below(OUT, outline_sheets)
         print(f"  XML-patch summaryBelow: sheets {outline_sheets}")
