@@ -1,0 +1,69 @@
+# ONESHOT — Investeringskalkyl v2, autonom nattkörning
+
+**Start:** 2026-06-13 (natt, UTC ~22:15). Mandat: bygg v2 från grunden, bättre än iter9, regression helig, fråga inget.
+**Branch:** `oneshot-v2`. **Baseline vid start:** grön (11 631 221,72 / 7,6452 % / +1,35 pp, commit `91c5679`).
+
+## Arkitekturbeslut (V2-01): spec-replay + v2-moduler
+
+iter9.xlsx är inte reproducerbar från noll — `build/iter9.py` patchar binärbaselinen iter8.xlsx,
+som i sin tur bär oåterskapbara lager (build-scripten för iter1-8 är förlorade, HANDOFF §0).
+
+v2 bryter det beroendet: `extract_spec.py` extraherar HELA iter9 (20 137 celler, 2 469 formler,
+stilar, merges, dimensioner, page setup, valideringar, kommentarer) till `spec_iter9.json`.
+`build_v2.py` bygger arbetsboken från tom `Workbook()` genom spec-replay och applicerar sedan
+v2-förbättringar som moduler. **v2 är därmed deterministiskt byggbar från enbart git-innehåll** —
+ingen binär baseline krävs. Det är i sig en leverabel förbättring.
+
+Motorflikarna replayas med **identiska celladresser** → `tests/regression.py` fungerar oförändrat
+mot v2-filen (mappningen är identitet). `regression_v2.py` wrappar den + lägger till nollfelsscan
+(inga #REF!/#DIV/0!/#VALUE!/#NAME?).
+
+## Fynd under spec-arbetet
+
+### F-1: TEXT()-formler är locale-trasiga i svensk Excel (objektiv defekt, ny)
+7 formler använder `TEXT(x,"#,##0")`-mönster. Formatsträngen tolkas enligt Excels UI-locale —
+i svensk Excel är `,` decimaltecken, så cached values visar skräp **i produktionsfilen idag**:
+- `Översikt!B20`: "Investering 200,0 Mkr · … 5000,0 m²" (skulle vara "200 Mkr · 5 000 m²")
+- `Översikt!J23`: "Marginal +0.00 pp · Krav 0.6%" (skulle vara "+1,35 pp · Krav 6,3 %")
+- `Översikt!F42`: "11631221,719 kr/år"
+- `Resultat!C19`: "hyresspann 10726244,344–12536199,095 kr/år"
+- Även `Försättsblad!E63`, `Försättsblad!C73`, `Översikt!J29`.
+
+**V2-regel:** aldrig TEXT() med talformat. Tal läggs i egna celler med `number_format`
+(locale-oberoende i filformatet); etiketter separat.
+
+### F-2: Hero-bilden är rotorsaken till Översikts 18-sidiga utskrift (bekräftar NIGHTRUN)
+Bilden (1786×765 px, OneCellAnchor B1) skalas inte av fit-to-page → sidblåsning.
+
+## V2-beslut (subjektiva, tagna autonomt per mandat)
+
+| # | Beslut | Motivering |
+|---|--------|-----------|
+| V2-01 | Spec-replay-arkitektur (ovan) | Reproducerbarhet från noll |
+| V2-02 | Hero-bilden UTGÅR ur Översikt | Rotorsak till 18-sidersbuggen; tillför ingen beslutsinformation. Cellbaserad accentbanner ersätter. Bilden finns kvar i assets/hero.png om Joakim vill återinföra på Försättsblad. |
+| V2-03 | Översikt byggs om: 1 sida liggande, print_area över hela layouten | Löser både sidblåsning och print_area-klippet (B1:F50 klippte högerspalten) |
+| V2-04 | Alla 7 TEXT()-ställen ersätts locale-säkert | F-1 |
+| V2-05 | Beräkningslogiks tekniska block (rad 48+) visas i **tkr** (`#,##0,`), märkt "Belopp i tkr" per blockrubrik | Löser ########; värden oförändrade (bara format). Pedagogiska delen (rad 1-47) behåller kr. |
+| V2-06 | Ny flik **Grafer** (efter Resultat): driftnetto år 1-20, ack. kassaflöde, hyresspann | LM 371 har Grafer-flik; iter9 saknar visualisering. D-14-förankrat. |
+| V2-07 | Sidnav regenereras med 10 poster (inkl Grafer) | tools/sidenav.py, NAV_ITEMS utökas |
+
+## Sanningskriterium
+Testfall Skola (Nyb) 5 000 kvm × 40 000 kr/kvm = 200 Mkr →
+`Resultat!D14` = 11 631 221,72 · `Lönsamhetskontroll!C45` = 7,6452 % · marginal +1,35 pp.
+Recalc: `tools/recalc.py` (Excel COM). Gate: `python build/oneshot/regression_v2.py`.
+
+## Ledger
+
+| Milstolpe | Status | Not |
+|-----------|--------|-----|
+| 1. Spec extraherad + designspec | ✅ | spec_iter9.json: 9 flikar, 20 137 celler, 2 469 formler. Ankare verifierade. |
+| 2. Motor (replay) grön | ⏳ | |
+| 3. Design: Översikt om, tkr-fix, Grafer, locale-fix | ⬜ | |
+| 4. Print: page setup + trogen PDF per flik | ⬜ | |
+| 5. Slutrapport + jämförelse | ⬜ | |
+
+## Kända brister / öppet
+_(fylls på under natten)_
+
+## Jämförelse v2 vs iter9
+_(skrivs i milstolpe 5)_
