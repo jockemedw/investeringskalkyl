@@ -380,17 +380,23 @@ def round_kassaflode_print(wb) -> None:
     from openpyxl.utils import get_column_letter
     ws = wb["Kassaflöde"]
 
+    # Tabellen täcker uppstartsåren 1-10 (årshuvuden D..M, som i iter9)
     for i, row in enumerate(range(30, 35)):
         krow = 26 + i  # Indata-rad för objekt 1-5
-        for col in range(4, 29):  # D..AB
+        for col in range(4, 14):  # D..M
             yc = get_column_letter(col)
             ws.cell(row=row, column=col).value = (
                 f'=IF(OR(Indata!$K${krow}="",{yc}$29<Indata!$K${krow}),0,'
                 f"(Indata!$R${krow}/Indata!$R$31)*{yc}$16)"
             )
-    for col in range(4, 29):
+        for col in range(14, 29):  # N..AB: rensa ströceller utan årshuvud
+            ws.cell(row=row, column=col).value = None
+    for col in range(4, 14):
         yc = get_column_letter(col)
         ws.cell(row=36, column=col).value = f"=IFERROR({yc}35/{yc}16,0)"
+    for col in range(14, 29):
+        ws.cell(row=35, column=col).value = None
+        ws.cell(row=36, column=col).value = None
 
     for col in range(5, 29):  # E..AB som D (13)
         ws.column_dimensions[get_column_letter(col)].width = 13

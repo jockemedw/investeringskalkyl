@@ -83,11 +83,57 @@ Recalc: `tools/recalc.py` (Excel COM). Gate: `python build/oneshot/regression_v2
 | 1. Spec extraherad + designspec | ✅ | spec_iter9.json: 9 flikar, 20 137 celler, 2 469 formler. Ankare verifierade. |
 | 2. Motor (replay) grön | ✅ | Exakt baslinje på första recalc. Nollfelsscan grön (iter9 har 2 #NAME? — fixade i v2, F-3). COM-krångel löst: strö-EXCEL + openpyxl "="-strängfällan. |
 | 3. Design: Översikt om, tkr-fix, Grafer, locale-fix | ✅ | Översikt 18→1 sida (ny design, statusblock, ingen hero). Beräkningslogik tkr (1242 celler) + F-4-polish. Kassaflöde F-5/F-6 (10→2 sidor). Grafer-flik med 3 diagram. Sidnav 10 poster. |
-| 4. Print: page setup + trogen PDF per flik | ⬜ | |
-| 5. Slutrapport + jämförelse | ⬜ | |
+| 4. Print: page setup + trogen PDF per flik | ✅ | Alla 10 flikar visuellt verifierade mot trogen ExportAsFixedFormat. 8 flikar ≤ 2 sidor. Inga ####, ingen kapad text på presentationsflikar. |
+| 5. Slutrapport + jämförelse | ✅ | Detta dokument + print_preview.pdf + grön regression som sista commit. |
 
-## Kända brister / öppet
-_(fylls på under natten)_
+## Slutresultat (morgon)
 
-## Jämförelse v2 vs iter9
-_(skrivs i milstolpe 5)_
+**v2 är klar och grön.** `build/oneshot/Investeringskalkyl_v2.xlsx`, byggd från noll av
+`build/oneshot/build_v2.py` (spec-replay + 11 v2-rundor), recalc:ad i Excel,
+verifierad: **11 631 221,72 kr/år · 7,6452 % · +1,35 pp · noll formelfel**.
+
+### Sidantal per flik (trogen PDF-export, `print_preview.pdf`)
+
+| Flik | iter9 | v2 |
+|------|------:|---:|
+| Översikt | 18 | **1** |
+| Försättsblad | 2 | 2 |
+| Indata | 2 | 2 |
+| Kassaflöde | 10 | **2** |
+| Finansiering | 2 | 2 |
+| Resultat | 1 | 1 |
+| Grafer | — | **1** (ny flik) |
+| Lönsamhetskontroll | 1–2 | 1–2 |
+| Beräkningslogik | 14 | 16* |
+| Dokumentation | 3 | 3 |
+
+\* Motorflik med 25 årskolumner × 230 rader — sidantalet är ärligt; v2 lägger rena
+brytningar (pedagogik | tekniska block | restvärdesresonemang) och allt är läsbart (tkr).
+Vill du ha kortare utskrift: sätt print_area till pedagogiska delen (B1:K45) — en rads ändring.
+
+### Jämförelse v2 vs iter9, flik för flik
+
+| Flik | Defekter i iter9 (produktionsfilen) | v2 |
+|------|--------------------------------------|----|
+| Översikt | 18-sidig utskrift (hero), print_area klippte högerspalten, 4 locale-trasiga TEXT() (visade bl.a. "Marginal +0.00 pp · Krav 0.6%", "+2,6 % tillväxt" som egentligen är **26,2 %**) | Omdesignad: 1 sida liggande, KPI-band, nytt LÖNSAMHETSKRAV-statusblock (✓/✗ med villkorsfärg), hyresspann, locale-säkra tal |
+| Försättsblad | ######## i beloppskolumner, "Kalkylstart 2026 år", huggen etikett, 2 locale-TEXT() | Rent; "Krav 6,3 %" korrekt |
+| Indata | "2 026 år", dubbla %-tecken (16 rader), ######## i Investering, rubrik-krockar sektion 3+4 | Rent |
+| Kassaflöde | ####### i ALLA årskolumner år 2+, 6 av 10 sidor blanka, **INFASNING-tabellen död** (F-5: $E$7-felreferens → allt 0) | 2 sidor, INFASNING räknar (andel × bruttohyra, "Andel av fullt flöde" = 100 %) |
+| Finansiering | ####### i alla årskolumner år 2+ | 2 rena sidor |
+| Resultat | locale-trasig tolkningstext ("hyresspann 10726244,344–…") | Rent |
+| Grafer | **fanns inte** (LM 371 har Grafer-flik) | Ny: driftnetto/år, ackumulerat driftnetto vs investering (återbetalning syns ~år 17), hyresspann. Synligt diagramunderlag. |
+| Lönsamhetskontroll | ####### i båda känslighetstabellerna, klippta formel-captions | Rent |
+| Beräkningslogik | ######## i rådatablocket, **2 #NAME?-fel** (F-3), stale radreferenser (F-4), huggen header, klippt radhöjd | tkr-block (1 242 celler), 0 formelfel, korrekta referenser, rena sidbrytningar |
+| Dokumentation | ~20 stycken vertikalt klippta, 5 stale "Rad på Kassaflöde"-referenser | Autofit-radhöjder, korrekta referenser, 3 rena sidor |
+
+**Arkitektur:** v2 byggs deterministiskt från enbart git-innehåll (spec_iter9.json + python).
+iter8-binärberoendet är borta. `regression_v2.py` = baslinjetest + nollfelsscan.
+
+## Kända brister / kvar för Joakim
+
+1. **Beräkningslogik 16 sidor** — se not ovan; designval om print ska trimmas.
+2. **Faktisk IRR EK per scenario** i känslighetstabellen — fortfarande öppen (§10, ej i nattens scope).
+3. **INFASNING** täcker uppstartsår 1–10 (som iter9:s design); formeln antar nu andel × faktisk bruttohyra. Om annan infasningsmodell önskas (t.ex. KPI-uppräknad bashyra) är det en medveten omprövning.
+4. **Hero-bilden** är borttagen (V2-02). `assets/hero.png` finns kvar — kan återinföras på Försättsblad med `oneCellAnchor` + fast storlek om bildelementet saknas.
+5. Kosmetiskt: en hjälpetikett i Grafers dataunderlag ("Lägsta (−10 %") kapas i cellen — syns inte i diagrammen.
+6. iter9.xlsx/iter9.py är orörda — jämförelsen ovan beskriver produktionsfilen som den ser ut idag.
