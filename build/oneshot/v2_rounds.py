@@ -62,6 +62,17 @@ def round_locale_fix(wb) -> None:
     )
 
 
+def round_forsattsblad_polish(wb) -> None:
+    """Försättsblad: kolumn D/E saknade bredd (8,43) → ######## i
+    PROJEKTBESKRIVNING-tabellens beloppskolumner. Kalkylstart hade
+    årsformat ('2026 år'). Etikett G60 höggs vid kolumnkanten."""
+    ws = wb["Försättsblad"]
+    ws.column_dimensions["D"].width = 16
+    ws.column_dimensions["E"].width = 14
+    ws["H8"].number_format = "0"
+    ws["G60"] = "Avkastningskrav EK"
+
+
 # ── V2-02/V2-03: Översikt — redesign till 1-sidigt beslutsdokument ──────────
 
 def _kpi_value(ws, ref, fmt, color=INK):
@@ -70,6 +81,28 @@ def _kpi_value(ws, ref, fmt, color=INK):
     c.alignment = Alignment(horizontal="left", vertical="center")
     c.number_format = fmt
     return c
+
+
+def round_indata_polish(wb) -> None:
+    """Indata: Kalkylstart visade '2 026 år' (tusentalsformat på årtal),
+    ######## i Investering-kolumnen (R utan bredd), dubbla procenttecken
+    (värdecellen %-formaterad OCH separat enhetskolumn '%')."""
+    ws = wb["Indata"]
+    ws["C5"].number_format = "0"
+    ws.column_dimensions["R"].width = 14
+    ws.column_dimensions["Q"].width = 12
+    ws.column_dimensions["M"].width = 13   # 'Hyra efter avtal'-rubriken kläms
+    for ref in ("D6", "D7", "D8", "D9", "D10", "D11", "D12", "D13",
+                "D18", "D54", "D61", "D62", "D63", "D64", "D65", "D68"):
+        ws[ref].value = None
+    # Sektion 4: rubrikerna 'DoU-höjning från år 11' / 'Ytterligare höjning…'
+    # överlappade — wrappa i rubrikraden i stället
+    for ref in ("E35", "F35"):
+        c = ws[ref]
+        c.alignment = Alignment(horizontal="center", vertical="bottom",
+                                wrap_text=True)
+    if ws.row_dimensions[35].height is None or ws.row_dimensions[35].height < 42:
+        ws.row_dimensions[35].height = 42
 
 
 def round_oversikt_v2(wb) -> None:
@@ -364,6 +397,31 @@ def round_kassaflode_print(wb) -> None:
 
     ws.print_area = "B1:W36"  # år 1-20; år 21-25 (X:AB) syns på skärm, skrivs ej ut
 
+    # Finansiering: samma defaultbredd-sjuka (####### i år 2+)
+    fin = wb["Finansiering"]
+    for col in range(5, 29):
+        fin.column_dimensions[get_column_letter(col)].width = 13
+    fin.print_area = "B1:W18"
+
+
+# ── Lönsamhetskontroll: ####### i känslighetstabellerna ─────────────────────
+
+def round_lonsamhetskontroll_print(wb) -> None:
+    """Kolumn D/E saknade bredd → ####### i 'Diff mot BV' och i
+    restvärdestabellens Bedömt/Pessimistisk-kolumner. Formel-captions (E27/E29)
+    höggs vid printkanten. fitToWidth=1 så den breddade tabellen skalas."""
+    ws = wb["Lönsamhetskontroll"]
+    ws.column_dimensions["D"].width = 14
+    ws.column_dimensions["E"].width = 14
+    ws["E27"] = "Formel: byggnadsvärde × (1 − N × avskr.)"
+    ws["E29"] = "Formel: driftnetto år 21 / direktavk."
+    ws.merge_cells("B51:E51")  # caption överflödade printkanten — wrap i merge
+    ws["B51"].alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+    ws.row_dimensions[51].height = 30
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+
 
 # ── V2-06: Grafer ────────────────────────────────────────────────────────────
 
@@ -374,7 +432,7 @@ def round_grafer(wb) -> None:
     idx = wb.sheetnames.index("Resultat") + 1
     ws = wb.create_sheet("Grafer", idx)
     ws.sheet_view.showGridLines = False
-    ws.column_dimensions["B"].width = 24
+    ws.column_dimensions["B"].width = 28
 
     ws.row_dimensions[1].height = 8
     ws.row_dimensions[2].height = 14
@@ -474,7 +532,8 @@ def round_grafer(wb) -> None:
     s_inv.graphicalProperties.line = LineProperties(solidFill=INK, w=18000,
                                                     prstDash="dash")
     s_inv.marker = Marker(symbol="none")
-    ch2.legend.position = "t"
+    ch2.legend.position = "b"
+    ch2.legend.overlay = False  # annars renderas legenden över x-axeln
     ch2.x_axis.tickLblSkip = 4
     ch2.x_axis.tickMarkSkip = 2
     _axes(ch2)
@@ -500,6 +559,59 @@ def round_grafer(wb) -> None:
     ws.page_setup.orientation = "landscape"
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 1
+    ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+
+
+# ── Dokumentation: klippt text + stale referenser ───────────────────────────
+
+DOC_REF_FIXES = [
+    ("Rad på Kassaflöde: C70 (NPV vid 0 hyra), C91 (känslighet)",
+     "Rad på Beräkningslogik: C119 (NPV vid 0 hyra), C140 (b_NPV)"),
+    ("Rad på Kassaflöde: C128 (NPV EK vid 0 hyra), C144 (b_IRR)",
+     "Rad på Beräkningslogik: C177 (NPV EK vid 0 hyra), C193 (b_IRR)"),
+    ("Rad på Kassaflöde: C150-C156",
+     "Rad på Beräkningslogik: Block F (rad 197–204)"),
+    ("(Kassaflöde rad 33)", "(Kassaflöde rad 22)"),
+    ("(Kassaflöde C123)", "(Beräkningslogik rad 172)"),
+]
+
+
+def round_dokumentation_polish(wb) -> None:
+    """Dokumentation: (1) ~20 stycken klipptes vertikalt — radhöjderna var
+    satta för lågt för den wrappade texten (render_local-renderaren visade
+    annan radbrytning än Excel). Autofit: höjd från textlängd vid B-bredd 100.
+    (2) Samma stale 'Rad på Kassaflöde'-referenser som F-4 — blocken ligger
+    på Beräkningslogik."""
+    import math
+    ws = wb["Dokumentation"]
+    CPL = 92          # tecken per rad vid bredd 100, Segoe UI 10-11pt (konservativt)
+    PT_PER_LINE = 14.5
+
+    for row in ws.iter_rows(min_col=2, max_col=2):
+        cell = row[0]
+        if not isinstance(cell.value, str):
+            continue
+        for old, new in DOC_REF_FIXES:
+            if old in cell.value:
+                cell.value = cell.value.replace(old, new)
+        wrapped = bool(cell.alignment and cell.alignment.wrapText)
+        if not wrapped and len(cell.value) > 110:
+            # långa o-wrappade rader (t.ex. sektion 14:s markerade) klipps
+            cell.alignment = Alignment(
+                horizontal=cell.alignment.horizontal if cell.alignment else "left",
+                vertical="top", wrap_text=True)
+            wrapped = True
+        if wrapped:
+            lines = max(1, math.ceil(len(cell.value) / CPL))
+            needed = lines * PT_PER_LINE + 4
+            rd = ws.row_dimensions[cell.row]
+            if rd.height is None or rd.height < needed:
+                rd.height = needed
+
+    # Merges B:E sträcker sig utanför print_area B1:B169 → svansen klipptes.
+    ws.print_area = "B1:E169"
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
     ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
 
 
@@ -535,10 +647,14 @@ def apply_all(wb) -> None:
     """Körs på workbook-objektet innan save."""
     fix_iter9_name_errors(wb)
     round_locale_fix(wb)
+    round_forsattsblad_polish(wb)
+    round_indata_polish(wb)
     round_oversikt_v2(wb)
     round_berakningslogik_tkr(wb)
     round_berakningslogik_polish(wb)
     round_kassaflode_print(wb)
+    round_lonsamhetskontroll_print(wb)
+    round_dokumentation_polish(wb)
     round_grafer(wb)
     round_sidenav(wb)
 
