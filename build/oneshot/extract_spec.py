@@ -86,10 +86,22 @@ def main() -> int:
             },
             "row_heights": {
                 str(k): {"height": v.height, "outline": v.outlineLevel,
-                         "hidden": bool(v.hidden)}
+                         "hidden": bool(v.hidden), "collapsed": bool(v.collapsed)}
                 for k, v in ws.row_dimensions.items()
-                if v.height is not None or v.outlineLevel or v.hidden
+                if v.height is not None or v.outlineLevel or v.hidden or v.collapsed
             },
+            "tab_color": ws.sheet_properties.tabColor.rgb
+            if (ws.sheet_properties.tabColor and
+                ws.sheet_properties.tabColor.type == "rgb") else None,
+            "validations": [
+                {"type": d.type, "formula1": d.formula1, "allow_blank": bool(d.allowBlank),
+                 "sqref": str(d.sqref)}
+                for d in ws.data_validations.dataValidation
+            ],
+            "comments": [
+                {"ref": c.coordinate, "text": c.comment.text, "author": c.comment.author}
+                for row in ws.iter_rows() for c in row if c.comment
+            ],
             "images": [
                 {"anchor": getattr(im.anchor, "_from", None) and {
                     "col": im.anchor._from.col, "row": im.anchor._from.row},

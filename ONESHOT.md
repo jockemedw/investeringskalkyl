@@ -32,6 +32,12 @@ i svensk Excel är `,` decimaltecken, så cached values visar skräp **i produkt
 **V2-regel:** aldrig TEXT() med talformat. Tal läggs i egna celler med `number_format`
 (locale-oberoende i filformatet); etiketter separat.
 
+### F-3: Två #NAME?-fel i produktions-iter9 (objektiv defekt, ny)
+`Beräkningslogik!D18` (`=-npv_0 / b`) och `D30` (`=max av de tre`) — pedagogiska
+anteckningar inskrivna som formler. Visas som `#NAME?` i filen idag. v2 lagrar dem som text.
+(Upptäcktes av regression_v2:s nollfelsscan — iter9:s regressionstest scannar inte formelfel.)
+Teknisk läxa: openpyxl skriver ALLA strängar som börjar med `=` som formler — även vid fix.
+
 ### F-2: Hero-bilden är rotorsaken till Översikts 18-sidiga utskrift (bekräftar NIGHTRUN)
 Bilden (1786×765 px, OneCellAnchor B1) skalas inte av fit-to-page → sidblåsning.
 
@@ -57,7 +63,7 @@ Recalc: `tools/recalc.py` (Excel COM). Gate: `python build/oneshot/regression_v2
 | Milstolpe | Status | Not |
 |-----------|--------|-----|
 | 1. Spec extraherad + designspec | ✅ | spec_iter9.json: 9 flikar, 20 137 celler, 2 469 formler. Ankare verifierade. |
-| 2. Motor (replay) grön | ⏳ | |
+| 2. Motor (replay) grön | ✅ | Exakt baslinje på första recalc. Nollfelsscan grön (iter9 har 2 #NAME? — fixade i v2, F-3). COM-krångel löst: strö-EXCEL + openpyxl "="-strängfällan. |
 | 3. Design: Översikt om, tkr-fix, Grafer, locale-fix | ⬜ | |
 | 4. Print: page setup + trogen PDF per flik | ⬜ | |
 | 5. Slutrapport + jämförelse | ⬜ | |
