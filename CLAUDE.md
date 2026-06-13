@@ -63,7 +63,8 @@ För ny §10-uppgift: lägg till `round_X_*(wb)` i [build/iter9.py](build/iter9.
 
 Status (senaste rad = överst):
 
-- [ ] **NÄSTA:** (öppen — Joakim väljer)
+- [ ] **NÄSTA:** Utskriftsformat v2 — färre sidor. All data ska vara kvar, men page setup ska komprimeras. Främst Beräkningslogik (16 sidor → mål ~2–4: t.ex. outline-kollapsa tekniska rådatablocket som default, eller separat print_area för pedagogiken B1:K45) och Dokumentation (3 sidor). Branch `oneshot-v2`, bygg via `python build/oneshot/build_v2.py`, verifiera med `build/oneshot/export_pdf.py`. (Godkänt 2026-06-13 — v2 ersätter iter9.)
+- [ ] **MERGE:** `oneshot-v2` är godkänd ("vi kör på den") men ännu inte mergad till main. Merge när utskriftsformatet är fixat.
 - [~] Design-pass alla 9 flikar (NIGHTRUN, autonomt): 7 rena, 2 → Joakim. Se [NIGHTRUN.md](NIGHTRUN.md). Öppna defekter som kräver designbeslut: **Översikt** (skrivs ut på 18 sidor pga flytande hero-bild + print_area `B1:F50` klipper högerspalten t.o.m. kol L), **Beräkningslogik** (`########` i tekniska rådata-blockets ~30 årskolumner pga `fitToWidth=2`-komprimering). Båda har diagnos + rekommenderad fix i NIGHTRUN. Meta: `render_local`/`/xlsx-review` opålitligt på flikar med icke-trivial page setup — verifiera med trogen export.
 - [x] Round AE: enhetligt designsystem — eyebrow/H1/H2-harmoni över alla 9 flikar (commit f25bfe7). Nya roller i `tools/theme.py`: `eyebrow`, `h1_display`, `h1_subtitle`, `h2_section`, `h3_sub`, `table_header`. Blå banner-sektioner ersatta med tunn underline-rule.
 - [x] Round Z: Resultat — utfall vid bindande kravhyra (NPV/IRR/MV-status, refererar Lönsamhetskontroll)
