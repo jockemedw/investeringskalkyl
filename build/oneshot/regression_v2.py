@@ -44,6 +44,18 @@ def main() -> int:
     if res["margin"] is not None:
         print(f"  Marginal mot krav:  {res['margin']*100:>+14.2f} pp           (väntade +{EXPECTED['irr_margin_pp']*100:.2f} pp)")
 
+    # FINAL m2: bedömt-scenariots IRR (D86) ska exakt matcha Faktisk IRR EK (C45)
+    wb = load_workbook(target, data_only=True)
+    lk = wb["Lönsamhetskontroll"]
+    d86, c45 = lk["D86"].value, lk["C45"].value
+    if d86 is not None:
+        match = isinstance(d86, float) and isinstance(c45, float) and abs(d86 - c45) < 1e-12
+        print(f"  IRR bedömt scenario: {d86:>15.4%}              (ska exakt = C45: {'✓' if match else '✗'})"
+              if isinstance(d86, float) else f"  IRR bedömt scenario: {d86!r} ✗")
+        if not match:
+            res["ok"] = False
+            res["fails"].append(f"Lönsamhetskontroll!D86 ({d86!r}) != C45 ({c45!r})")
+
     errors = scan_errors(target)
     if errors:
         print(f"\n✗ FORMELFEL ({len(errors)}):")

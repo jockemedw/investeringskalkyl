@@ -788,6 +788,68 @@ def round_print_polish(wb) -> None:
     lk.row_dimensions[51].height = 34
 
 
+# ── FINAL m2: Faktisk IRR EK per yield-scenario ─────────────────────────────
+
+def round_irr_yield_scenarios(wb) -> None:
+    """FINAL m2: Faktisk IRR EK per scenario i restvärdestabellen (rad 73+).
+    EK-cashflow rekonstrueras per scenario i ett dolt outline-block (rad 89–91),
+    samma mönster som MV-exit-tabellens rad 64–70: kassaflödet är linjärt i
+    hyran (Beräkningslogik block D/E: rad 173 vid 0 kr, rad 188 vid 1 Mkr),
+    plus exit-delta i år 20-kolumnen (Y) för scenarioyielden. Bedömt-kolumnen
+    (D78 = Indata!D81, D82 = MAX(D79:D81) = Resultat!D14) är per konstruktion
+    identisk med rad 43 → IRR exakt = C45.
+
+    Fixar också en timing-bugg i MV-exit-tabellen (D-20): ΔMV adderades i
+    kolumn AD (år 25) men exiten ligger i Y (år 20) — scenariots IRR fick
+    kassaflödesjusteringen 5 år för sent. Bas-scenariot opåverkat (Δ=0)."""
+    from copy import copy
+    from openpyxl.utils import get_column_letter
+    ws = wb["Lönsamhetskontroll"]
+
+    # (a) MV-exit: flytta ΔMV från AD (år 25) till Y (år 20)
+    for i, r in enumerate(range(64, 71)):
+        ws.cell(row=r, column=30).value = "=AD43"
+        ws.cell(row=r, column=25).value = f"=Y43+$C{54 + i}-$C$58"
+
+    # (b) Synlig IRR-rad i yield-tabellen (rad 86, inom print_area B1:H87)
+    b = ws["B86"]
+    b.value = "Faktisk IRR EK"
+    b.font = copy(ws["B84"].font)
+    for col, cfrow in (("C", 89), ("D", 90), ("E", 91)):
+        c = ws[f"{col}86"]
+        c.value = f'=IFERROR(IRR(F{cfrow}:AD{cfrow}),"")'
+        c.font = copy(ws[f"{col}84"].font)
+        c.fill = copy(ws[f"{col}84"].fill)
+        c.alignment = copy(ws[f"{col}84"].alignment)
+        c.number_format = "0.00%"
+    ws.row_dimensions[86].height = 18
+    ws["B87"] = ("IRR EK räknas vid respektive scenarios bindande kravhyra och yield "
+                 "(EK-cashflöde per scenario i expanderbart block nedan). Bedömt = "
+                 "Faktisk IRR EK (C45). Om krav 2 (IRR) är bindande är IRR EK exakt "
+                 "= avkastningskravet; annars strikt högre än kravet.")
+
+    # (c) Dolt EK-cashflow-block, rad 89–91 (utanför print_area; dolda rader skrivs ej ut)
+    cap = ws["B88"]
+    cap.value = "EK-cashflöde per yield-scenario — klicka [+] för att expandera"
+    cap.font = copy(ws["B63"].font)
+    for r, col in ((89, "C"), (90, "D"), (91, "E")):
+        for cc in range(6, 31):  # F..AD ↔ Beräkningslogik D..AB (år 1..25)
+            bl = get_column_letter(cc - 2)
+            f = (f"=Beräkningslogik!{bl}173"
+                 f"+(Beräkningslogik!{bl}188-Beräkningslogik!{bl}173)*{col}$82/1000000")
+            if cc == 25:  # Y = år 20: exit-delta (MV vid scenarioyield − MV vid basyield)
+                f += (f"+(Beräkningslogik!$C$199"
+                      f"+(Beräkningslogik!$C$200-Beräkningslogik!$C$199)*{col}$82/1000000)"
+                      f"*(1/{col}$78-1/Indata!$D$81)")
+            cell = ws.cell(row=r, column=cc)
+            cell.value = f
+            cell.number_format = "#,##0"
+        rd = ws.row_dimensions[r]
+        rd.outlineLevel = 1
+        rd.hidden = True
+    ws.row_dimensions[88].collapsed = True  # summaryBelow=0 → + på raden ovanför
+
+
 # ── Pipeline ────────────────────────────────────────────────────────────────
 
 def apply_all(wb) -> None:
@@ -803,6 +865,7 @@ def apply_all(wb) -> None:
     round_lonsamhetskontroll_print(wb)
     round_dokumentation_polish(wb)
     round_grafer(wb)
+    round_irr_yield_scenarios(wb)
     round_print_compact(wb)
     round_sidenav(wb)
     # OBS: polish sist — sidenav sätter radhöjd 30 på rad 2–11 på ALLA flikar,
