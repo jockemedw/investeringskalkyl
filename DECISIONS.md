@@ -147,4 +147,28 @@ Beslut som har tagits genom projektet, med motivering. Varje beslut är låst om
 
 ---
 
+## D-20: Exit-delta i år 20-kolumnen för scenario-IRR
+**Beslut:** Känslighetstabellernas per-scenario-IRR (Lönsamhetskontroll) justerar exit-värdet i år 20-kolumnen (Y i EK-cashflow-raderna) — inte i sista kolumnen (AD = år 25).
+**Motivering:** Exiten ligger i år 20 (kolumn Y i rad 43). MV-exit-tabellens ursprungliga implementation adderade ΔMV i AD, vilket gav scenario-IRR en kassaflödesjustering 5 år för sent och underskattade känsligheten (spann 6,38–8,14 % i stället för korrekta 5,83–8,36 %).
+**Konsekvens:** Bas-scenariot opåverkat (Δ=0), regression grön. −40 %-scenariot flaggar nu korrekt "⚠ IRR<krav".
+**Verifierat:** Lönsamhetskontroll!E54:E60 mot C45 (FINAL m2, 2026-07-10).
+
+---
+
+## D-21: IRR EK per yield-scenario via dolt EK-cashflow-block
+**Beslut:** Restvärdestabellen (Lönsamhetskontroll rad 73+) visar Faktisk IRR EK per scenario (rad 86). EK-cashflow rekonstrueras per scenario i ett dolt outline-block (rad 89–91): linjärt i hyran via Beräkningslogik block D/E + exit-delta i år 20 för scenarioyielden. IRR räknas vid respektive scenarios egen bindande kravhyra.
+**Motivering:** §10-uppgiften "Faktisk IRR EK per scenario". Samma mönster som befintlig IRR-beräkning (rad 43) och MV-exit-blocket (rad 64–70) — ingen ny mekanik.
+**Konsekvens:** Bedömt-scenariot är per konstruktion identiskt med rad 43 → IRR exakt = C45 (valideras i regression_v2.py, bit-för-bit).
+**Verifierat:** Lönsamhetskontroll!C86:E86 = 7,69 % / 7,65 % / 7,60 % (2026-07-10).
+
+---
+
+## D-22: Printstrategi — pedagogik skrivs ut, rådata kollapsas
+**Beslut:** Utskrift optimeras per flik: Beräkningslogiks tekniska rådatablock (rad 48–206) är outline-kollapsat som default (dolda rader skrivs inte ut; expanderas med +), print_area = pedagogiken B1:K230. Kassaflöde/Finansiering skriver ut med fitToHeight=1 + upprepade etikettkolumner B:C. Dokumentation: prosa wrappar över hela printbredden (9 pt body). Sidenav-bandet (kolumn A) skrivs inte ut på Försättsblad.
+**Motivering:** §10 utskriftsformat v2 — hela boken 31 → 18 sidor med all data kvar i filen. Trogen PDF-export (ExportAsFixedFormat) är enda verifieringskällan; PageSetup.Pages.Count avviker från faktisk PDF-paginering.
+**Konsekvens:** Om rådatablocket expanderas på skärm och skrivs ut manuellt klipps kolumner bortom K — dokumenterat i Beräkningslogik B47. Dokumentation-body 9 pt (≈6,6 pt i print) är medveten täthet för 2-sidorsmålet.
+**Verifierat:** print_preview.pdf 18 sidor, sida-för-sida-granskad (FINAL m1/m3, 2026-07-10).
+
+---
+
 *Lägg till nya beslut längst ner med löpande nummer. Ändra ALDRIG befintliga — markera som "OMPRÖVAD i D-XX" om de ersätts.*

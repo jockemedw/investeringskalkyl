@@ -1,9 +1,11 @@
 # CLAUDE.md — Investeringskalkyl Lejonfastigheter
 
-Ersättare för LM 371 Investeringskalkyl. Ren xlsx (inga makron), 8 flikar, 20-årig kalkyl.
+Ersättare för LM 371 Investeringskalkyl. Ren xlsx (inga makron), 10 flikar, 20-årig kalkyl.
 Beställare: Lejonfastigheter AB (kommunalt fastighetsbolag, Linköping).
 
-## Aktuell baseline (iter 8)
+**Aktuell produkt:** `build/oneshot/Investeringskalkyl_v2.xlsx` (v2 ersätter iter9, byggd från spec-replay + rundor). Utskrift: 18 sidor för hela boken, trogen-PDF-verifierad.
+
+## Aktuell baseline (iter 8 → v2 reproducerar exakt)
 
 | Mätvärde | Värde | Cell |
 |----------|-------|------|
@@ -16,19 +18,18 @@ Testfall: Skola (Nyb) 5 000 kvm × 40 000 kr/kvm = 200 Mkr.
 ## Arbetsflöde
 
 ```bash
-# Verifiera baseline mot iter8 cached values:
-python tests/regression.py
+# Bygga v2 (spec-replay + rundor + recalc + regression i ett):
+python build/oneshot/build_v2.py
 
-# Bygga aktuell iter (modulärt — en funktion per §10-uppgift):
-python build/iter9.py
-python tests/regression.py build/iter9.xlsx
+# Enbart regressionsgate (baslinje + nollfelsscan + IRR-scenariovalidering):
+python build/oneshot/regression_v2.py
 
-# Visuell designgranskning av en .xlsx (Excel COM → PNG → vision-analys):
-# Triggar xlsx-review skill — Claude rapporterar layoutproblem, ändrar ingen kod
-/xlsx-review build/iter9.xlsx
+# Trogen utskriftsexport (Excel COM ExportAsFixedFormat) — enda sanningen
+# för print/design; PageSetup.Pages.Count och render_local/xlsx-review ljuger:
+python build/oneshot/export_pdf.py   # → build/oneshot/print_preview.pdf + .print/*.pdf
 ```
 
-För ny §10-uppgift: lägg till `round_X_*(wb)` i [build/iter9.py](build/iter9.py), anropa från `main()`. Köra → verifiera → designgranska → committa.
+För ny §10-uppgift: lägg till `round_*(wb)` i [build/oneshot/v2_rounds.py](build/oneshot/v2_rounds.py), registrera i `apply_all()`. OBS: `round_print_polish` ska ligga sist (sidenav sätter radhöjd 30 på rad 2–11 på alla flikar). Köra → PDF-granska → committa.
 
 ## Kärnkonventioner
 
@@ -48,14 +49,20 @@ För ny §10-uppgift: lägg till `round_X_*(wb)` i [build/iter9.py](build/iter9.
 
 ## Filer
 
-- `Investeringskalkyl_iter8.xlsx` — baseline (auktoritativ — ändra inte direkt)
+- `build/oneshot/Investeringskalkyl_v2.xlsx` — **den färdiga produkten** (artefakt — byggs av build_v2.py)
+- `build/oneshot/build_v2.py` — bygger v2 från spec_iter9.json + v2_rounds
+- `build/oneshot/v2_rounds.py` — en funktion per förbättringsrunda, `apply_all()` är pipelinen
+- `build/oneshot/regression_v2.py` — gate: baslinje + nollfelsscan + IRR-scenariomatch
+- `build/oneshot/export_pdf.py` — trogen PDF-export, sidantal per flik
+- `Investeringskalkyl_iter8.xlsx` — historisk baseline (auktoritativ referens — ändra inte)
 - `tools/patches.py` — load/save/diff/rename/replace-utilities
 - `tools/recalc.py` — Excel COM via PowerShell eller LibreOffice headless
+- `tools/theme.py` / `tools/sidenav.py` — designsystem (roller, palett) + sidnavigator
 - `tests/regression.py` — verifierar 11 631 222 / 7,65 % / +1,35 pp
-- `build/iter9.py` — pågående iter, en funktion per §10-uppgift
-- `build/demo_roundtrip.py` — sanity check för pipelinen
+- `build/iter9.py` — historisk iter (ersatt av v2)
 - `HANDOFF.md` — projektkontext, fashistorik, arkitektur
-- `DECISIONS.md` — designval D-01 → D-19 (D-XX OMPRÖVAR D-YY när ersatts)
+- `FINAL.md` — slutrapport ONESHOT-FINAL (2026-07-10)
+- `DECISIONS.md` — designval D-01 → D-22 (D-XX OMPRÖVAR D-YY när ersatts)
 - `TECH_NOTES.md` — openpyxl-mönster, default-värden för iter 8
 - `OPEN_QUESTIONS.md` — frågor som behöver Joakim-input
 
@@ -63,9 +70,12 @@ För ny §10-uppgift: lägg till `round_X_*(wb)` i [build/iter9.py](build/iter9.
 
 Status (senaste rad = överst):
 
-- [ ] **LÄGST PRIO (sist av allt — 2026-06-13):** Utskriftsformat v2 — färre sidor. All data ska vara kvar, men page setup ska komprimeras. Främst Beräkningslogik (16 sidor → mål ~2–4: t.ex. outline-kollapsa tekniska rådatablocket som default, eller separat print_area för pedagogiken B1:K45) och Dokumentation (3 sidor). Branch `oneshot-v2`, bygg via `python build/oneshot/build_v2.py`, verifiera med `build/oneshot/export_pdf.py`. (Godkänt 2026-06-13 — v2 ersätter iter9.)
+- [x] **ONESHOT-FINAL klar (2026-07-10):** alla öppna §10-uppgifter stängda — se [FINAL.md](FINAL.md). Ej pushad till origin (Joakim pushar efter granskning).
+- [x] **FINAL m3 (2026-07-10):** design-excellens-pass, 2 hela trogen-PDF-granskningsvarv över alla 18 sidor. Indata sektion 5-mallrader fixade (commit b9bdb2a).
+- [x] **FINAL m2 (2026-07-10):** Faktisk IRR EK per yield-scenario (Lönsamhetskontroll rad 86, dolt EK-cashflow-block rad 89–91). Bedömt == C45 exakt, valideras i regressionsgaten. + D-20: timing-fix i MV-exit-tabellens scenario-IRR (commit a6ab310).
+- [x] **FINAL m1 (2026-07-10):** Utskriftsformat v2 klart — hela boken 31 → 18 sidor (Beräkningslogik 16→3 via outline-kollaps av rådatablocket, Dokumentation 3→2, Kassaflöde 4→2, Resultat 2→1). Inga ########, ingen kapad text (commit 0df6d82). Se D-22.
 - [x] **MERGE klar (2026-06-13):** `oneshot-v2` fast-forwardad till `main` (HEAD `5c746ca`). Frikopplad från print. Ej pushad till origin ännu.
-- [~] Design-pass alla 9 flikar (NIGHTRUN, autonomt): 7 rena, 2 → Joakim. Se [NIGHTRUN.md](NIGHTRUN.md). Öppna defekter som kräver designbeslut: **Översikt** (skrivs ut på 18 sidor pga flytande hero-bild + print_area `B1:F50` klipper högerspalten t.o.m. kol L), **Beräkningslogik** (`########` i tekniska rådata-blockets ~30 årskolumner pga `fitToWidth=2`-komprimering). Båda har diagnos + rekommenderad fix i NIGHTRUN. Meta: `render_local`/`/xlsx-review` opålitligt på flikar med icke-trivial page setup — verifiera med trogen export.
+- [x] Design-pass alla 9 flikar (NIGHTRUN, autonomt): 7 rena, 2 → Joakim — **båda defekterna lösta i v2/FINAL m1** (Översikt 18-sidorsbuggen försvann med v2:s Översikt-redesign; Beräkningslogik ######## löst via tkr-block + outline-kollaps). Se [NIGHTRUN.md](NIGHTRUN.md). Meta kvarstår: `render_local`/`/xlsx-review` opålitligt på flikar med icke-trivial page setup — verifiera med trogen export.
 - [x] Round AE: enhetligt designsystem — eyebrow/H1/H2-harmoni över alla 9 flikar (commit f25bfe7). Nya roller i `tools/theme.py`: `eyebrow`, `h1_display`, `h1_subtitle`, `h2_section`, `h3_sub`, `table_header`. Blå banner-sektioner ersatta med tunn underline-rule.
 - [x] Round Z: Resultat — utfall vid bindande kravhyra (NPV/IRR/MV-status, refererar Lönsamhetskontroll)
 - [x] Round Y: Indata-beskrivningar sektion 6-9 + räntenivå-renamning (Aktuell / Långsiktig)
@@ -78,6 +88,6 @@ Status (senaste rad = överst):
 - [x] Round C: Indata-fält renamning — branschterminologi
 - [x] Round E: "År N" → "år 20" (commit c423d5e)
 - [x] Round B: pedagogisk omskrivning Beräkningslogik (commit dab830b)
-- [ ] Faktisk IRR EK per scenario i känslighetstabellen — kräver full EK-cashflow-rekonstruktion för opt/pess (icke-trivialt, ej börjat)
+- [x] Faktisk IRR EK per scenario i känslighetstabellen — klar i FINAL m2 (se ovan, D-21)
 
-Joakim väljer ordning. Inga uppgifter blockerar varandra.
+Inga öppna §10-uppgifter. Nästa: Joakim granskar + pushar main till origin.
