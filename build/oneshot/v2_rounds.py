@@ -647,6 +647,147 @@ def round_sidenav(wb) -> None:
         sidenav.apply_to_sheet(ws, ws.title, paths)
 
 
+# ── FINAL m1: printkomprimering ─────────────────────────────────────────────
+
+def round_print_compact(wb) -> None:
+    """FINAL m1: Beräkningslogik 16 sidor → pedagogik-only i print.
+    Tekniska rådatablocket (rad 48–206) outline-kollapsas som default — all
+    data kvar i filen, expanderas via +-symbolen (dolda rader skrivs inte ut).
+    Print smalnas till B1:K230 med fitToWidth=1; restvärdesresonemangets
+    B:R-merges om-mergas till B:K så inget klipps vid nya printkanten.
+    Dokumentation: tomma spacer-rader 15 → 8 pt (prosan orörd)."""
+    import math
+    from openpyxl.worksheet.pagebreak import RowBreak
+
+    ws = wb["Beräkningslogik"]
+    for r in range(48, 207):
+        rd = ws.row_dimensions[r]
+        rd.outlineLevel = 1
+        rd.hidden = True
+    # summaryBelow=0 (XML-patch i build_v2) → +-symbolen ligger på raden ovanför
+    ws.row_dimensions[47].collapsed = True
+
+    ws["B47"] = ("Rådata bakom kravhyrorna. Block A/B ger NPV-kravet, D/E ger "
+                 "IRR-kravet, F ger MV-kravet. Belopp i tkr. Blocket är kollapsat — "
+                 "expandera med +-symbolen i vänstermarginalen. Kollapsade rader "
+                 "skrivs inte ut.")
+    ws["B47"].alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+    ws.row_dimensions[47].height = 34
+
+    CPL = 145  # tecken per rad vid B:K-bredd (38+22+8×13 ≈ 164 enheter)
+    for m in [str(x) for x in list(ws.merged_cells.ranges)]:
+        match = re.fullmatch(r"B(\d+):R(\d+)", m)
+        if match and match.group(1) == match.group(2) and int(match.group(1)) >= 208:
+            r = int(match.group(1))
+            ws.unmerge_cells(m)
+            ws.merge_cells(f"B{r}:K{r}")
+            text = ws.cell(row=r, column=2).value
+            if isinstance(text, str):
+                lines = max(1, math.ceil(len(text) / CPL))
+                ws.row_dimensions[r].height = lines * 14.5 + 6
+
+    ws.row_breaks = RowBreak()  # sektionbrytningarna vid 45/207 behövs inte längre
+    ws.print_area = "B1:K230"
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+
+    # Dokumentation: prosan wrappade i B (100 enheter) men printbredden var
+    # B:E (139) — 28 % av sidbredden stod tom. Bredda B till hela printbredden,
+    # släpp B:E-merges och autofit om med tightare leading. Spacer-rader → 6 pt.
+    dok = wb["Dokumentation"]
+    for m in [str(x) for x in list(dok.merged_cells.ranges)]:
+        if re.fullmatch(r"B\d+:E\d+", m):
+            dok.unmerge_cells(m)
+    W_DOK = 152
+    dok.column_dimensions["B"].width = W_DOK
+    for r in range(4, 170):
+        cell = dok.cell(row=r, column=2)
+        v = cell.value
+        rd = dok.row_dimensions[r]
+        if not isinstance(v, str) or not v.strip():
+            rd.height = 2.5
+            continue  # spacer
+        wrapped = bool(cell.alignment and cell.alignment.wrapText)
+        size = cell.font.size or 10
+        if cell.font.name == "Segoe UI" and size == 10 and not cell.font.bold:
+            cell.font = Font(name="Segoe UI", size=9, color=cell.font.color)
+            size = 9
+        if wrapped and size <= 11:
+            # ≈0,88 tecken/breddenhet×10/size (konservativt mot Excelwrap);
+            # 11pt Semibold behöver ~15,5pt/rad — annars klipps highlight-boxarna
+            cpl = int(W_DOK * 8.8 / size)
+            lines = max(1, math.ceil(len(v) / cpl))
+            leading = 1.45 if size > 10 else 1.37
+            rd.height = lines * (leading * size) + 2
+        else:
+            cur = rd.height or 15
+            if cur > 1.5 * size:
+                rd.height = 1.5 * size  # trimma luftiga enrads-rader (rubriker + bullets)
+    dok.print_area = "B1:B169"
+    dok.page_margins.top = 0.4
+    dok.page_margins.bottom = 0.4
+
+
+def round_print_polish(wb) -> None:
+    """FINAL m1b: fynd från trogen PDF-granskning (sida-för-sida, 22-sidorspasset).
+    - H1-nedstaplar (g/y) klipptes: Översikt 36pt / Försättsblad 42pt i 30pt-rad
+    - Resultat: ####### i kolumn E (Högsta-utfall) + rad kluven av sidbrytning → 1 sida
+    - Kassaflöde/Finansiering: årsremsa 2034–2045 utan radetiketter + föräldralösa
+      svanssidor → fitToHeight=1 + upprepade etikettkolumner B:C
+    - Grafer: print_area slutade vid N → diagramdata-kolumnerna O..V klipptes
+    - Lönsamhetskontroll: B51-mergen (t.o.m. H) låg utanför print_area (G) → klippt caption
+    - Försättsblad: sidenav-bandet slutar abrupt mitt på sid 2 i print → print utan kolumn A
+      (nav är skärmnavigation; övriga flikar printar redan från B)"""
+    from openpyxl.utils import get_column_letter
+
+    wb["Översikt"].row_dimensions[3].height = 48
+    fs = wb["Försättsblad"]
+    fs.row_dimensions[4].height = 56
+    fs.print_area = "B1:I92"  # högerkolumnens värde-merges (H:I) ska med
+    fs.page_setup.fitToWidth = 1
+    fs.page_setup.fitToHeight = 0
+    fs.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+    from openpyxl.worksheet.pagebreak import Break as _Break, RowBreak as _RowBreak
+    fs.row_breaks = _RowBreak()
+    fs.row_breaks.append(_Break(id=45))  # sid 1 = memo/cover, sid 2 = antaganden→underskrifter
+
+    r = wb["Resultat"]
+    r.column_dimensions["E"].width = 18
+    r.row_dimensions[19].height = 48  # Tolkning (C19:F19, 134 tecken ≈ 3 rader) klipptes vid 27,75
+    r.page_setup.fitToWidth = 1
+    r.page_setup.fitToHeight = 1
+    r.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+
+    for name, caprows in (("Kassaflöde", (11, 27)), ("Finansiering", (8,))):
+        ws = wb[name]
+        ws.page_setup.fitToHeight = 1
+        ws.print_title_cols = "B:C"
+        # Captions är spec-mergade B:M (in i årskolumnerna) → klipps vid remsgränsen
+        # när bara B:C upprepas på sid 2. Krymp mergen till B:C och wrappa.
+        for caprow in caprows:
+            for m in [str(x) for x in list(ws.merged_cells.ranges)]:
+                if m.startswith(f"B{caprow}:"):
+                    ws.unmerge_cells(m)
+            ws.merge_cells(start_row=caprow, start_column=2, end_row=caprow, end_column=3)
+            cap = ws.cell(row=caprow, column=2)
+            cap.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+            lines = max(1, -(-len(str(cap.value)) // 50))
+            ws.row_dimensions[caprow].height = lines * 14 + 4
+
+    g = wb["Grafer"]
+    for col in ("C", "D", "E"):
+        g.column_dimensions[col].width = 15
+    g.print_area = "B1:V53"
+    g.page_setup.orientation = "landscape"
+    g.page_setup.fitToWidth = 1
+    g.page_setup.fitToHeight = 1
+    g.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+
+    lk = wb["Lönsamhetskontroll"]
+    lk.print_area = "B1:H87"
+    lk.row_dimensions[51].height = 34
+
+
 # ── Pipeline ────────────────────────────────────────────────────────────────
 
 def apply_all(wb) -> None:
@@ -662,7 +803,11 @@ def apply_all(wb) -> None:
     round_lonsamhetskontroll_print(wb)
     round_dokumentation_polish(wb)
     round_grafer(wb)
+    round_print_compact(wb)
     round_sidenav(wb)
+    # OBS: polish sist — sidenav sätter radhöjd 30 på rad 2–11 på ALLA flikar,
+    # vilket klipper H1-nedstaplar (Översikt 36pt, Försättsblad 42pt)
+    round_print_polish(wb)
 
 
 def post_save(out_path: Path) -> None:
