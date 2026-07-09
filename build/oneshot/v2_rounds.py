@@ -850,6 +850,23 @@ def round_irr_yield_scenarios(wb) -> None:
     ws.row_dimensions[88].collapsed = True  # summaryBelow=0 → + på raden ovanför
 
 
+# ── FINAL m3: design-excellens ──────────────────────────────────────────────
+
+def round_design_final(wb) -> None:
+    """FINAL m3: designfynd från trogen PDF-granskning. Indata sektion 5
+    (re-investering): tomma mallrader renderade som ett kantlöst blått block
+    med sex lösryckta nollor i Total-kolumnen — hårlinjer mellan raderna och
+    tomt i stället för 0 tills något matas in."""
+    ws = wb["Indata"]
+    hair = Side(style="hair", color=RULE)
+    for r in range(45, 51):
+        for c in range(2, 7):
+            cell = ws.cell(row=r, column=c)
+            b = cell.border
+            cell.border = Border(left=b.left, right=b.right, top=b.top, bottom=hair)
+        ws.cell(row=r, column=6).number_format = '#,##0;-#,##0;""'
+
+
 # ── Pipeline ────────────────────────────────────────────────────────────────
 
 def apply_all(wb) -> None:
@@ -866,6 +883,7 @@ def apply_all(wb) -> None:
     round_dokumentation_polish(wb)
     round_grafer(wb)
     round_irr_yield_scenarios(wb)
+    round_design_final(wb)
     round_print_compact(wb)
     round_sidenav(wb)
     # OBS: polish sist — sidenav sätter radhöjd 30 på rad 2–11 på ALLA flikar,
