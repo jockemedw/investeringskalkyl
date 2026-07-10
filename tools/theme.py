@@ -28,6 +28,11 @@ RULE     = "DEE2E6"   # bottom-rule
 # Härledda tints (för status-bg)
 POSITIVE_TINT = "E0F2EE"
 
+# Input-språket (D-23): blå fyllnad + hårlinjekant = "här fyller du i".
+# Enda godkända input-signalen — grå SURFACE är förbehållet headers/zebra.
+INPUT = "D6EAF8"
+INPUT_EDGE = "9FC1DA"
+
 # ── Typ-skala ──────────────────────────────────────────────────────────────
 FAMILY = "Segoe UI"
 
@@ -97,6 +102,15 @@ def apply(cell, role: str) -> None:
 def bottom_rule(cell) -> None:
     """Tunn ljusgrå avgränsare under sista raden i en sektion."""
     cell.border = Border(bottom=Side(style="thin", color=RULE))
+
+
+def mark_input(cell) -> None:
+    """Gör en cell till inputcell: blå fyllnad, hårlinjeram, olåst (D-23)."""
+    from openpyxl.styles import Protection
+    cell.fill = PatternFill("solid", fgColor=INPUT)
+    e = Side(style="hair", color=INPUT_EDGE)
+    cell.border = Border(left=e, right=e, top=e, bottom=e)
+    cell.protection = Protection(locked=False)
 
 
 def clear_format(cell) -> None:

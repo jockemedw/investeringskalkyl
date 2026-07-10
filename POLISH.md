@@ -72,3 +72,36 @@ kolumn G, zebra-tabellerna, KPI-bandet på Översikt, "Fyll i"-kursiven som idé
 
 Before-skärmdumpar: `scratchpad/screens_m1/` (session) — nyckelbilder kopieras
 till `docs/polish/` i m5.
+
+## m2 — Input-språket (2026-07-10)
+
+Implementerat som `round_input_language` + `round_sheet_protection` i
+[build/oneshot/v2_rounds.py](build/oneshot/v2_rounds.py); input-stilen bor i
+`tools/theme.py` (`INPUT`, `INPUT_EDGE`, `mark_input()`).
+
+- **Ett input-språk (D-23):** blå `D6EAF8` + hårlinjekant på ALLA inputceller —
+  inkl. hyresobjektstabellen (S2 löst), DoU-tabellen och Försättsbladets fält.
+  Gråa input-fills ersatta; C72 städad till ren beräkning (S3).
+- **51 datavalideringar** med svensk prompt (fältnamn + enhet/exempel) och
+  svenskt felmeddelande: år 1990–2100, procent 0–100 %, belopp ≥ 0,
+  kalkylperiod 1–25, objektnr 1–5, dropdowns. Verifierat på skärm (prompten
+  renderas) och programmatiskt.
+- **Bladskydd utan lösenord (D-24):** alla flikar utom Lönsamhetskontroll +
+  Beräkningslogik (xlsx-skydd blockerar outline-expandering; deras kollapsade
+  block är del av designen). Tab vandrar mellan olåsta inputfält.
+  COM-verifierat: låst cell avvisas, input skrivbar, outline expanderbar,
+  sidnav-länkar fungerar. Regression grön.
+- Semi-inputs: Indata C9 (auto-formel som får överskrivas) olåst utan blå
+  fill, med förklarande prompt; underskrifter/bildytor på Försättsblad olåsta
+  utan fill.
+
+**Verktygsfynd (viktigt):** Excel målar ALDRIG om rutnätet vid programmatisk
+scroll i bakgrundsfönster (ScrollRow/Goto/Select uppdaterar modellen, inte
+pixlarna; zoom målar om). `screenshot_sheets.py` löser det genom att baka in
+scroll-positionen i en temporär kopia (XML-patch av sheetView/pane
+topLeftCell) så öppningsritningen hamnar rätt, och fångar fönstret med
+PrintWindow-API:t — fokus stjäls inte och andra fönster kan inte förorena
+bilden (CopyFromScreen fångade användarens webbläsare).
+
+Kvar till m3: Motivering-kolumnen E75:E78 för smal för text; nollbrus i tomma
+objektrader; öppningsvy/markörposition; nav-pelarens abrupta slut.

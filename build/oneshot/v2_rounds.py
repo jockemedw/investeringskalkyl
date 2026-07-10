@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 import sys
 sys.path.insert(0, str(ROOT))
 
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, Protection
 from openpyxl.chart import BarChart, LineChart, Reference, Series
 from openpyxl.chart.marker import Marker
 from openpyxl.drawing.line import LineProperties
@@ -867,6 +867,175 @@ def round_design_final(wb) -> None:
         ws.cell(row=r, column=6).number_format = '#,##0;-#,##0;""'
 
 
+# ── POLISH m2: ett input-språk + validering + bladskydd (D-23/D-24) ────────
+
+# Valideringstyper med svenska felmeddelanden. "text" = ingen typkontroll,
+# bara inmatningsprompt (Excel "Any value" + input message).
+_DV_KINDS = {
+    "year": dict(type="whole", operator="between", formula1="1990", formula2="2100",
+                 error="Ange ett kalenderår mellan 1990 och 2100, t.ex. 2026."),
+    "pct": dict(type="decimal", operator="between", formula1="0", formula2="1",
+                error="Ange en procentsats mellan 0 % och 100 %, t.ex. 6,3 %."),
+    "num": dict(type="decimal", operator="greaterThanOrEqual", formula1="0",
+                error="Ange ett tal större än eller lika med 0."),
+    "period": dict(type="whole", operator="between", formula1="1", formula2="25",
+                   error="Ange kalkylperiod i hela år, 1–25. Standard är 20."),
+    "objnr": dict(type="whole", operator="between", formula1="1", formula2="5",
+                  error="Ange objektnummer 1–5 — radnummer i hyresobjekts­tabellen."),
+    "text": {},
+}
+
+# (kind, ranges, promptTitle, prompt). list-kinds: (("list", formel), ...)
+_INDATA_INPUTS = [
+    ("year", ["C5"], "Kalkylstart", "Första kalenderåret i kalkylen, t.ex. 2026."),
+    ("pct", ["C6"], "Direktavkastning marknad", "Yield från senaste externa värdering, t.ex. 5,0 %."),
+    ("pct", ["C7"], "Kalkylränta driftnetto", "Företagets diskonteringsränta för NPV-kravet, t.ex. 4,0 %."),
+    ("pct", ["C8"], "Inflation", "Årlig KPI-uppräkning, t.ex. 2,0 %."),
+    ("pct", ["C10"], "Bolagsskatt", "Aktuell bolagsskattesats, t.ex. 20,6 %."),
+    ("pct", ["C11"], "Långsiktig vakansnivå", "Vakans efter avtalsslut. 0 % vid säker uthyrning."),
+    ("pct", ["C12", "C13"], "Momsregistreringsgrad", "Andel momsregistrerad yta, oftast 100 %."),
+    ("period", ["C16"], "Kalkylperiod", "Antal år i kalkylen. Standard 20."),
+    ("num", ["C17"], "Byggnadsvärde", "Investering exkl. mark, i kronor. Påverkar avskrivning och IRR."),
+    ("pct", ["C18"], "Avskrivningstakt", "Linjär avskrivning, t.ex. 3 % = 33 års livslängd."),
+    ("num", ["C20"], "Fastighetsarea (mark)", "Total markarea i kvm."),
+    ("num", ["C21"], "Markvärde", "Kronor per kvm mark."),
+    (("list", '"Beräkna,Ange"'), ["C23"], "Hyresläge",
+     "Beräkna = mallen räknar kravhyran. Ange = manuell (ej aktiv än)."),
+    ("text", ["B26:B30"], "Objektnamn", "Hyresobjektets namn, t.ex. Skola."),
+    (("list", '"Bef,Omb,Nyb,Ins,Mar"'), ["C26:C30"], "Typ",
+     "Bef = befintligt, Omb = ombyggnad, Nyb = nybyggnad, Ins = installationer, Mar = mark."),
+    ("num", ["D26:E30"], "Area", "Kvm BRA. Bef area = befintlig yta, Nyb area = tillkommande."),
+    ("pct", ["H26:H30"], "Indexuppräkning", "Andel av KPI som hyran räknas upp med, t.ex. 70 %."),
+    ("year", ["K26:L30"], "Avtalsår", "Kalenderår för avtalsstart resp. avtalsslut."),
+    ("num", ["M26:M30"], "Hyra efter avtal", "Kr/kvm efter avtalsslut. Lämna tomt för monopolmodell (samma kr/kvm fortsätter)."),
+    ("pct", ["N26:N30"], "Vakans", "Objektets vakansrisk under avtalstiden, oftast 0 %."),
+    ("year", ["O26:P30"], "Produktionsår", "Kalenderår för produktionsstart resp. produktionsslut."),
+    ("num", ["Q26:Q30"], "Budget", "Investeringsbudget i kr/kvm BRA."),
+    ("num", ["C36:D40"], "Drift & underhåll", "Kronor per kvm och år."),
+    ("pct", ["E36:F40"], "DoU-höjning", "Procentuell höjning av posten från år 11 resp. år 16."),
+    ("text", ["B45:B50"], "Åtgärd", "Re-investering eller hyresatt underhåll, t.ex. Takbyte."),
+    ("objnr", ["C45:C50"], "Objekt", "Objektnummer 1–5 — rad i hyresobjektstabellen ovan."),
+    ("year", ["D45:D50"], "År", "Kalenderår då åtgärden utförs."),
+    ("num", ["E45:E50"], "Belopp", "Kronor per kvm av objektets totalarea."),
+    ("num", ["C53"], "Central administration", "Kr/kvm och år. Lejonfastigheters schablon: 80."),
+    ("pct", ["C54"], "Fastighetsskatt", "Procent av taxeringsvärdet. 0 % för skattebefriad verksamhet."),
+    ("num", ["C55"], "Taxeringsvärde", "Kronor. Bas för fastighetsskatten."),
+    ("num", ["C56"], "Tomträttsavgäld", "Kr/år. 0 om marken är friköpt."),
+    ("num", ["C57", "C58"], "Bokfört värde", "Kronor. 0 vid ren nybyggnation."),
+    ("pct", ["C61"], "Aktuell räntenivå", "Nuvarande marknadsränta, t.ex. 3,0 %."),
+    ("pct", ["C62"], "Långsiktig räntenivå", "Genomsnittlig ränta efter ca 10 år, t.ex. 4,0 %."),
+    ("pct", ["C63"], "Amortering", "Årlig amorteringstakt som procent av låneskulden."),
+    ("pct", ["C64"], "Belåningsgrad", "Lejonfastigheters snittbelåning, t.ex. 37 %."),
+    ("pct", ["C65"], "Avkastningskrav eget kapital", "IRR-kravet på eget kapital, t.ex. 6,3 %."),
+    ("pct", ["C68"], "Investeringsintervall", "± på investeringen som ger hyresspannet, t.ex. 10 %."),
+    (("list", '"Mycket positivt,Något positivt,Neutralt,Något negativt,Mycket negativt"'),
+     ["C75", "C76", "C77", "C78"], "Bedömning",
+     "Justerar yielden med −0,50 till +0,50 pp per parameter."),
+    ("text", ["E75:E78"], "Motivering", "Kort motivering till bedömningen."),
+]
+
+_FORSATTSBLAD_INPUTS = [
+    ("text", ["C9"], "Fastighet", "Fastighetsbeteckning, t.ex. Innerstaden 1:14."),
+    ("text", ["C10"], "Objekt", "Byggnad eller del av fastighet."),
+    ("text", ["C11"], "Projektnummer", "Lejonfastigheters projektnummer."),
+    ("text", ["C12"], "Kalkyl utförd av", "Namn på den som upprättat kalkylen."),
+    ("num", ["C17:E17", "C18:E18", "C20:E20"], "Projektbeskrivning",
+     "Kvm BRA, investeringsbelopp i kr resp. kr/kvm. Nybyggnad och Mark hämtas från Indata."),
+    ("text", ["B25"], "Projektbeskrivning", "Bakgrund, vision, kvalitetsambition, tidplan."),
+    ("num", ["C40"], "Marknadsvärde", "Kronor, enligt senaste externa värdering."),
+    ("text", ["H40"], "Värderingsdatum", "T.ex. 2026-01-15."),
+    ("num", ["C43:D44"], "Byggrätter", "Kvm BTA före resp. efter projektet."),
+]
+
+
+def _input_cells(ws, rng):
+    got = ws[rng]
+    if hasattr(got, "coordinate"):
+        return [got]
+    return [c for row in got for c in row]
+
+
+def round_input_language(wb) -> None:
+    """POLISH m2 (D-23): ETT input-språk. Blå fyllnad + hårlinjekant = fyll i,
+    överallt — inkl. hyresobjektstabellen som helt saknade markering. Varje
+    inputfält får datavalidering med svensk prompt + svenskt felmeddelande.
+    Alla inputceller olåses (bladskyddet i round_sheet_protection ger då
+    Tab-vandring mellan fälten). Gråa input-fills ersätts; C72 (formel med
+    input-fill) städas till ren beräkning."""
+    from openpyxl.worksheet.datavalidation import DataValidation
+    from tools.theme import mark_input
+
+    # Ersätt spec-replayens tre meddelandelösa valideringar med nya
+    wb["Indata"].data_validations.dataValidation = []
+
+    for sheet, table in (("Indata", _INDATA_INPUTS),
+                         ("Försättsblad", _FORSATTSBLAD_INPUTS)):
+        ws = wb[sheet]
+        for kind, ranges, title, prompt in table:
+            if isinstance(kind, tuple):  # ("list", formel)
+                spec = dict(type="list", formula1=kind[1],
+                            error="Välj ett av alternativen i listan.")
+            else:
+                spec = dict(_DV_KINDS[kind])
+            err = spec.pop("error", "")
+            dv = DataValidation(allow_blank=True, showInputMessage=True,
+                                showErrorMessage=bool(err) or None,
+                                promptTitle=title[:32], prompt=prompt[:255],
+                                errorTitle="Ogiltigt värde" if err else None,
+                                error=err or None, **spec)
+            for rng in ranges:
+                dv.add(rng)
+                for c in _input_cells(ws, rng):
+                    mark_input(c)
+            ws.add_data_validation(dv)
+
+    ind = wb["Indata"]
+    # C72 Investeringsgrad är en beräkning — bort med input-fillen (S3)
+    ind["C72"].fill = PatternFill(fill_type=None)
+    # C9 Kalkylränta restvärde: auto-formel som får överskrivas — olåst men
+    # utan blå fill (auto per default), med förklarande prompt
+    ind["C9"].protection = Protection(locked=False)
+    dv9 = DataValidation(allow_blank=True, showInputMessage=True,
+                         promptTitle="Kalkylränta restvärde",
+                         prompt="Auto = direktavkastning + inflation. "
+                                "Skriv ett eget värde för att sätta räntan manuellt.")
+    dv9.add("C9")
+    ind.add_data_validation(dv9)
+
+    fs = wb["Försättsblad"]
+    # Underskrifter + bild-/kartplatshållare: olåsta men utan blå fill
+    # (underskriftslinjer resp. ytor för infogade objekt)
+    for rng in ("C76:E78", "H76:I78", "B30", "G30"):
+        for c in _input_cells(fs, rng):
+            c.protection = Protection(locked=False)
+
+    # Merged input-celler: olås hela mergen om ankaret är olåst
+    for ws in (ind, fs):
+        for m in ws.merged_cells.ranges:
+            anchor = ws.cell(m.min_row, m.min_col)
+            if anchor.protection and not anchor.protection.locked:
+                for c in _input_cells(ws, str(m)):
+                    c.protection = Protection(locked=False)
+
+
+def round_sheet_protection(wb) -> None:
+    """POLISH m2 (D-24): bladskydd utan lösenord — formler kan inte skrivas
+    sönder, Tab hoppar mellan de olåsta inputfälten. Lönsamhetskontroll och
+    Beräkningslogik lämnas OSKYDDADE: xlsx-bladskydd blockerar expandering av
+    outline-grupper, och deras kollapsade block (+-symbolerna) är del av
+    designen. Markering av låsta celler tillåts (sidnav-länkarna ligger på
+    låsta celler)."""
+    SKIP = {"Lönsamhetskontroll", "Beräkningslogik"}
+    for ws in wb.worksheets:
+        if ws.title in SKIP:
+            continue
+        ws.protection.sheet = True
+        ws.protection.selectLockedCells = False    # False = tillåtet
+        ws.protection.selectUnlockedCells = False
+        ws.protection.formatColumns = True         # True = blockerat
+        ws.protection.formatRows = True
+
+
 # ── Pipeline ────────────────────────────────────────────────────────────────
 
 def apply_all(wb) -> None:
@@ -884,11 +1053,14 @@ def apply_all(wb) -> None:
     round_grafer(wb)
     round_irr_yield_scenarios(wb)
     round_design_final(wb)
+    round_input_language(wb)
     round_print_compact(wb)
     round_sidenav(wb)
     # OBS: polish sist — sidenav sätter radhöjd 30 på rad 2–11 på ALLA flikar,
     # vilket klipper H1-nedstaplar (Översikt 36pt, Försättsblad 42pt)
     round_print_polish(wb)
+    # Skyddet allra sist: inga rundor ska behöva skriva i en "låst" bok
+    round_sheet_protection(wb)
 
 
 def post_save(out_path: Path) -> None:

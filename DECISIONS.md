@@ -171,4 +171,20 @@ Beslut som har tagits genom projektet, med motivering. Varje beslut är låst om
 
 ---
 
+## D-23: Ett input-språk — blå fyllnad är den enda "fyll i här"-signalen
+**Beslut:** Alla inputceller i hela boken markeras med blå fyllnad `D6EAF8` + hårlinjekant `9FC1DA` (`tools/theme.py: mark_input()`), och varje inputfält har datavalidering med svensk prompt (fältnamn + enhet/exempel) och svenskt felmeddelande. Beräknade celler har ingen fyllnad. Grå SURFACE är förbehållet tabellheaders/zebra. Semi-inputs (auto-formler som får överskrivas, t.ex. Indata C9) är olåsta med prompt men utan blå fill.
+**Motivering:** m1-auditen fann tre olika input-språk och att hyresobjektstabellen — bokens viktigaste inmatning — helt saknade markering. Användaren ska på en halv sekund se VAR man fyller i och VAD som förväntas (ONESHOT-POLISH mål 3–4).
+**Konsekvens:** Iter8/LM 371:s grå input-boxar ersatta. 51 valideringar (år/procent/belopp/listor).
+**Verifierat:** Skärmdump + programmatisk scan (POLISH m2, 2026-07-10).
+
+---
+
+## D-24: Bladskydd utan lösenord — utom på outline-flikarna
+**Beslut:** Alla flikar utom Lönsamhetskontroll och Beräkningslogik har bladskydd utan lösenord: formelceller låsta, inputceller olåsta (Tab vandrar mellan inputfälten). Lönsamhetskontroll/Beräkningslogik lämnas oskyddade.
+**Motivering:** Ingen ska kunna råka skriva sönder en formel (ONESHOT-POLISH mål 4). xlsx-bladskydd blockerar dock expandering av outline-grupper, och de kollapsade rådata-/EK-cashflow-blocken (D-21/D-22) är del av designen — skydd där skulle döda +-symbolerna. Excel COM:s EnableOutlining/UserInterfaceOnly persisteras inte i ren xlsx.
+**Konsekvens:** De två analysflikarnas formler är oskyddade — accepterad risk (läsflikar långt från ifyllnadsflödet). Skyddet blockerar inte recalc, sidnav-hyperlänkar eller outline (COM-verifierat).
+**Verifierat:** COM-stickprov: låst cell avvisas, C5 skrivbar, ShowLevels(2) expanderar (POLISH m2, 2026-07-10).
+
+---
+
 *Lägg till nya beslut längst ner med löpande nummer. Ändra ALDRIG befintliga — markera som "OMPRÖVAD i D-XX" om de ersätts.*
