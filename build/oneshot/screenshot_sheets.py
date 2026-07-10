@@ -186,6 +186,15 @@ def screenshot(xlsx: Path, out_dir: Path, sheets: list[str] | None = None,
     out1 = measure_file.read_text(encoding="utf-8-sig") if measure_file.exists() else ""
     measure_file.unlink(missing_ok=True)
 
+    # Dolda rader (outline-kollaps m.m.) syns inte i vyn — paginera bara över
+    # synliga rader, annars blir flera sidor identiska (Beräkningslogik hade
+    # 5 dubblettvyer av sitt kollapsade rådatablock).
+    import openpyxl
+    _wb = openpyxl.load_workbook(xlsx)
+    hidden = {ws.title: {r for r, rd in ws.row_dimensions.items() if rd.hidden}
+              for ws in _wb.worksheets}
+    _wb.close()
+
     # MEASURE|namn|index|lastRow|visRows
     pages: dict[int, dict] = {}  # sida k -> {sheet_index: (namn, rad)}
     for line in out1.splitlines():
@@ -195,11 +204,10 @@ def screenshot(xlsx: Path, out_dir: Path, sheets: list[str] | None = None,
         idx, last, vis = int(idx), int(last), int(vis)
         if vis < 4:
             continue
-        r, k = 1 + vis, 1
-        while r <= last:
+        vis_rows = [r for r in range(1, last + 1)
+                    if r not in hidden.get(name, set())]
+        for k, r in enumerate(vis_rows[vis::vis], start=1):
             pages.setdefault(k, {})[idx] = (name, r)
-            r += vis
-            k += 1
 
     tmpdir = Path(tempfile.mkdtemp(prefix="sheetshots_"))
     try:

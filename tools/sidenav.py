@@ -186,6 +186,10 @@ def apply_to_sheet(ws, current_sheet: str, asset_paths: dict[str, Path]) -> None
         # Texten i cellen bakom: tom (bilden täcker), men säkerställ ingen synlig text
         if cell.value is None:
             cell.value = ""
+        # Excel COM-save ersätter tom länktext med adressen ("'Indata'!A1") och
+        # knapp-PNG:erna kan driva någon pixel — INK-på-INK gör texten osynlig
+        # oavsett vad Excel skriver dit.
+        cell.font = Font(color=INK, size=8)
 
     # Frys så kolumn A följer med vid horisontell scroll
     # (vertikal scroll förlorar nav — accepterat trade-off i ren xlsx)

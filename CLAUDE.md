@@ -25,11 +25,17 @@ python build/oneshot/build_v2.py
 python build/oneshot/regression_v2.py
 
 # Trogen utskriftsexport (Excel COM ExportAsFixedFormat) — enda sanningen
-# för print/design; PageSetup.Pages.Count och render_local/xlsx-review ljuger:
+# för print/design; PageSetup.Pages.Count och render_local/xlsx-review ljuger
+# (även export_pdf:s egen stdout-tabell kan visa fel — räkna sidor i PDF:erna):
 python build/oneshot/export_pdf.py   # → build/oneshot/print_preview.pdf + .print/*.pdf
+
+# Skärmgranskning — OBLIGATORISK efter varje designändring: riktiga Excel-
+# renderingar av varje fliks alla vyer. Granska VARJE PNG med egna ögon
+# innan "klart" — att köra verktyget utan att titta räknas inte:
+python build/oneshot/screenshot_sheets.py --out <dir> [--sheets A,B]
 ```
 
-För ny §10-uppgift: lägg till `round_*(wb)` i [build/oneshot/v2_rounds.py](build/oneshot/v2_rounds.py), registrera i `apply_all()`. OBS: `round_print_polish` ska ligga sist (sidenav sätter radhöjd 30 på rad 2–11 på alla flikar). Köra → PDF-granska → committa.
+För ny §10-uppgift: lägg till `round_*(wb)` i [build/oneshot/v2_rounds.py](build/oneshot/v2_rounds.py), registrera i `apply_all()`. OBS: `round_print_polish` ska ligga sist (sidenav sätter radhöjd 30 på rad 2–11 på alla flikar). Köra → PDF-granska → skärmgranska → committa.
 
 ## Kärnkonventioner
 
@@ -70,6 +76,7 @@ För ny §10-uppgift: lägg till `round_*(wb)` i [build/oneshot/v2_rounds.py](bu
 
 Status (senaste rad = överst):
 
+- [x] **Skärmgranskningsvarv (2026-07-10):** alla 25 skärmvyer granskade ögon-på-pixlar → 6 fix: sidenav-länktextläcka (INK-på-INK-font — Excel COM-save skriver adressen som text i tomma länkceller), Grafer-diagram 2/3 rad 24→18 (8-radershål i öppningsvyn), Försättsblad Mark-rad = Fyll i-input + Summa=SUM(D17:D21) (minsta markvärde är restvärdesgolv, ej investering), 2 klippta LK-etiketter, Dokumentation-callout i gul stil, screenshot_sheets paginerar nu bara synliga rader. Print fortsatt 18 sidor (per-flik-PDF:erna verifierade — export_pdf:s stdout-tabell sa fel). Se `round_screen_review_fixes`.
 - [x] **ONESHOT-POLISH klar (2026-07-10):** ifyllnadsupplevelsen på skärm — ett blått input-språk (51 svenska valideringar), bladskydd med Tab-vandring (outline-flikar undantagna, D-24), öppningsvy per flik + ifyllnadsguide/status, tom mall utan felkoder, 2 skärm-granskningsvarv + programmatisk interaktionskontroll. Print fortsatt 18 sidor. Se [POLISH.md](POLISH.md), D-23–D-25. Skärmvyer verifieras med `build/oneshot/screenshot_sheets.py`. Ej pushad.
 - [x] **ONESHOT-FINAL klar (2026-07-10):** alla öppna §10-uppgifter stängda — se [FINAL.md](FINAL.md). Ej pushad till origin (Joakim pushar efter granskning).
 - [x] **FINAL m3 (2026-07-10):** design-excellens-pass, 2 hela trogen-PDF-granskningsvarv över alla 18 sidor. Indata sektion 5-mallrader fixade (commit b9bdb2a).

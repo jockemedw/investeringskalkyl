@@ -543,7 +543,9 @@ def round_grafer(wb) -> None:
     ch2.x_axis.tickLblSkip = 4
     ch2.x_axis.tickMarkSkip = 2
     _axes(ch2)
-    ws.add_chart(ch2, "B24")
+    # Rad 18, inte 24: sidenav gör rad 2–11 30pt höga → diagram 1 (241pt från
+    # rad 6) slutar redan vid rad ~16; rad 24 gav ett 8-raders hål i skärmvyn.
+    ws.add_chart(ch2, "B18")
 
     # 3) Hyresspann
     ch3 = BarChart()
@@ -558,7 +560,7 @@ def round_grafer(wb) -> None:
     ch3.set_categories(Reference(ws, min_col=3, max_col=5, min_row=50, max_row=50))
     ch3.series[0].graphicalProperties.solidFill = ACCENT
     _axes(ch3, y_fmt='#,##0.0,,')
-    ws.add_chart(ch3, "J24")
+    ws.add_chart(ch3, "J18")
 
     ws.freeze_panes = "B1"
     ws.print_area = "B1:N53"
@@ -1237,6 +1239,47 @@ def round_m4_polish(wb) -> None:
 
 # ── Pipeline ────────────────────────────────────────────────────────────────
 
+def round_screen_review_fixes(wb) -> None:
+    """Fynd från skärmgranskningsvarv med screenshot_sheets (2026-07-10):
+
+    - Försättsblad: Mark-raden i PROJEKTBESKRIVNING auto-hämtade Indatas
+      *minsta markvärde* (ett restvärdesgolv, ingen investering) och
+      Summa-radens belopp pekade på Indata!R31 → tabellen såg ut att summera
+      fel (200 + 5 = 205 ≠ 200). Mark blir Fyll i-input som övriga rader och
+      Summa summerar kolumnen den står i.
+    - Lönsamhetskontroll: B17/B28 klipptes vid kolumn C ("…IRI", "…kravhy").
+    - Dokumentation: B166/167 hade mörk callout — avvek från flikens gula
+      callout-stil (B38)."""
+    from copy import copy
+    from tools.theme import mark_input
+
+    fs = wb["Försättsblad"]
+    for col in "CDE":
+        src, dst = fs[f"{col}17"], fs[f"{col}21"]
+        dst.value = "Fyll i"
+        dst.font = copy(src.font)
+        dst.alignment = copy(src.alignment)
+        dst.number_format = src.number_format
+        mark_input(dst)
+    fs["D22"] = "=SUM(D17:D21)"
+    for dv in fs.data_validations.dataValidation:
+        if "C17:E17" in str(dv.sqref):
+            dv.add("C21:E21")
+            dv.prompt = dv.prompt.replace("Nybyggnad och Mark hämtas",
+                                          "Nybyggnad hämtas")
+
+    lk = wb["Lönsamhetskontroll"]
+    lk["B17"] = "NPV EK vid kravhyra IRR"
+    lk["B28"] = "Driftnetto år 21 vid bindande hyra"
+
+    dok = wb["Dokumentation"]
+    gul = dok["B38"]
+    for r in (166, 167):
+        c = dok.cell(r, 2)
+        c.fill = copy(gul.fill)
+        c.font = copy(gul.font)
+
+
 def apply_all(wb) -> None:
     """Körs på workbook-objektet innan save."""
     fix_iter9_name_errors(wb)
@@ -1255,6 +1298,7 @@ def apply_all(wb) -> None:
     round_guidance(wb)
     round_empty_state(wb)
     round_input_language(wb)
+    round_screen_review_fixes(wb)
     round_print_compact(wb)
     round_sidenav(wb)
     # OBS: polish sist — sidenav sätter radhöjd 30 på rad 2–11 på ALLA flikar,
