@@ -150,7 +150,9 @@ def apply_to_sheet(ws, current_sheet: str, asset_paths: dict[str, Path]) -> None
     # Måla kolumn A med INK-bg hela vägen ner till sista innehållsraden —
     # nav-pelaren ska vara obruten över hela fliken (även när content är lång).
     last_nav_row = START_ROW + len(NAV_ITEMS) - 1
-    bg_end_row = max(last_nav_row + 2, ws.max_row + 5)
+    # Min 80 rader: pelaren ska inte sluta mitt på skärmen på korta flikar
+    # (kolumn A skrivs aldrig ut — print_area börjar på B överallt)
+    bg_end_row = max(last_nav_row + 2, ws.max_row + 5, 80)
     for r in range(1, bg_end_row + 1):
         cell = ws.cell(r, 1)
         cell.fill = ink_fill

@@ -867,6 +867,176 @@ def round_design_final(wb) -> None:
         ws.cell(row=r, column=6).number_format = '#,##0;-#,##0;""'
 
 
+# ── POLISH m3: vägledning & öppningsvy ──────────────────────────────────────
+
+def round_guidance(wb) -> None:
+    """POLISH m3: (a) Indata sektion 9 omlagd — Motivering får K:R (E var 6
+    enheter smal), vägledningstexterna F:J; (b) nollbrus döljs i tomma
+    objektrader (Indata/Resultat/Kassaflöde visar inte 0/0,0 % för objekt som
+    inte finns); (c) ifyllnadsguide + nyckelfältsstatus på Försättsblad;
+    (d) öppningsvy per flik: markören på första inputfältet resp. B2,
+    Kassaflöde fryser årshuvud + etikettkolumner (D5); (e) Försättsblad är
+    aktiv flik när filen öppnas (ifyllnadsflödet börjar där)."""
+    from openpyxl.worksheet.views import Selection
+    from openpyxl.worksheet.hyperlink import Hyperlink
+
+    # (a) Sektion 9: captions F:J, Motivering K:R
+    ind = wb["Indata"]
+    for r in range(75, 79):
+        for m in [str(x) for x in list(ind.merged_cells.ranges)]:
+            if m.startswith(f"F{r}:") or m == f"E{r}":
+                ind.unmerge_cells(m)
+        ind.merge_cells(f"F{r}:J{r}")
+        ind.merge_cells(f"K{r}:R{r}")
+    for m in [str(x) for x in list(ind.merged_cells.ranges)]:
+        if m == "E74:R74":
+            ind.unmerge_cells(m)
+    ind["E74"] = None
+    apply(ind["K74"], "label")
+    ind["K74"] = "Motivering"
+    ind["K74"].font = Font(name=FAMILY, size=10, bold=True, color=INK)
+    for r in range(75, 79):          # E-cellernas gamla gråa input-fill bort
+        ind[f"E{r}"].fill = PatternFill(fill_type=None)
+
+    # (b) Nollbrus: tomma objektrader ska vara tomma, inte fulla med nollor
+    HIDE0_INT = '#,##0;-#,##0;""'
+    HIDE0_PCT = '0.0%;-0.0%;""'
+    for r in range(27, 31):          # Indata hyresobjekt: tomma rader 27-30
+        for col in ("F", "J", "R"):
+            ind[f"{col}{r}"].number_format = HIDE0_PCT if col == "J" else HIDE0_INT
+    for r in range(26, 31):          # "(ej använd)"-kolumnerna visas aldrig
+        ind[f"G{r}"].number_format = ";;;"
+        ind[f"I{r}"].number_format = ";;;"
+
+    rs = wb["Resultat"]
+    for r in range(25, 30):          # Fördelning per hus: 5 objektrader
+        rs[f"C{r}"].number_format = HIDE0_PCT
+        rs[f"D{r}"].number_format = HIDE0_INT
+        rs[f"E{r}"].number_format = HIDE0_INT
+    # V1/V2 (m1-audit): hero D14 visade ####### på skärm (20 pt behöver ~24
+    # enheter); B-etiketterna ("2. Kravhyra för IRR ≥ avkastningskrav") klipptes
+    rs.column_dimensions["B"].width = 36
+    rs.column_dimensions["D"].width = 24
+
+    kf = wb["Kassaflöde"]
+    for r in range(31, 35):          # INFASNING: oanvända objektrader
+        for c in range(4, 14):
+            kf.cell(row=r, column=c).number_format = HIDE0_INT
+
+    # (c) Ifyllnadsguide + status på Försättsblad (tomytan G16:H22)
+    fs = wb["Försättsblad"]
+    apply(fs["G16"], "h3_sub")
+    fs["G16"] = "SÅ FYLLER DU I"
+    steps = [
+        ("G17", "1.  Försättsblad — projektinfo och beskrivning", None),
+        ("G18", "2.  Indata — alla förutsättningar (blå fält)", "Indata!C5"),
+        ("G19", "3.  Resultat — läs av kravhyra och spann", "Resultat!B2"),
+    ]
+    for ref, txt, link in steps:
+        apply(fs[ref], "label")
+        fs[ref] = txt
+        if link:
+            fs[ref].hyperlink = Hyperlink(ref=ref, location=link, display=txt)
+    apply(fs["G20"], "caption")
+    fs["G20"] = "Blå fält = inmatning. Allt annat räknas fram."
+    apply(fs["G21"], "caption")
+    n_parts = (
+        '(C9<>"Fyll i")*(C9<>"")+(C10<>"Fyll i")*(C10<>"")'
+        '+(C11<>"Fyll i")*(C11<>"")+(C12<>"Fyll i")*(C12<>"")'
+        "+(Indata!B26<>\"\")+(Indata!E26<>\"\")+(Indata!Q26<>\"\")"
+        "+(Indata!K26<>\"\")+(Indata!L26<>\"\")+(Indata!O26<>\"\")+(Indata!P26<>\"\")"
+    )
+    fs["G21"] = (f'=IF(({n_parts})=11,"✓ Alla nyckelfält ifyllda",'
+                 f'"Ifyllnad: "&({n_parts})&" av 11 nyckelfält")')
+
+    # (d) Öppningsvy: markör på första inputfältet resp. flikens hero
+    kf.freeze_panes = "D5"           # årshuvud (rad 3-4) + etiketter B:C fryses
+    START_CELL = {
+        "Försättsblad": "C9", "Indata": "C5", "Kassaflöde": "D5",
+    }
+    for ws in wb.worksheets:
+        cell = START_CELL.get(ws.title, "B2")
+        pane = "topRight"
+        if ws.title == "Kassaflöde":
+            pane = "bottomRight"
+        elif ws.title == "Finansiering":
+            pane = "bottomRight"
+            cell = "D6"
+        ws.sheet_view.selection = [Selection(pane=pane, activeCell=cell,
+                                             sqref=cell)]
+
+    # (e) Filen öppnas på Försättsblad — där ifyllnaden börjar
+    wb.active = wb.sheetnames.index("Försättsblad")
+
+
+# ── POLISH m3b: tom mall utan felkaskader på presentationsytorna ────────────
+
+# Celler som visar #DIV/0!/#VALUE! när inga hyresobjekt är ifyllda ännu
+# (verifierat via tom mall-testet). Motorflikarna (Kassaflöde, Lönsamhets-
+# kontroll, Grafer-underlaget) lämnas — fel där är normalt mitt i en ifyllnad
+# och försvinner när objektraden fylls i.
+_EMPTY_STATE_CELLS = {
+    "Översikt": ["B8", "E8", "H8", "H9", "F13", "F14", "F15",
+                 "J13", "J14", "J15", "B24", "E24", "H24"],
+    "Försättsblad": ["C53", "C54", "C55", "C64", "C65", "C66", "C67",
+                     "C71", "C72"],
+    "Resultat": ["C10", "D10", "E10", "C11", "D11", "E11", "C12", "D12",
+                 "E12", "C14", "D14", "E14", "C15", "D15", "E15",
+                 "D25", "D26", "D27", "D28", "D29", "D30",
+                 "C36", "F36", "C38", "C39", "C40", "F40"],
+    "Beräkningslogik": ["C18", "C20", "C26", "C27", "C28", "C30"],
+}
+
+
+def round_empty_state(wb) -> None:
+    """POLISH m3: en tom mall ska inte se trasig ut. Utan hyresobjekt ger
+    R31=0/F31=0 en kaskad av #DIV/0! (518 celler). Presentationsytornas
+    formler wrappas i IFERROR(...,"–") — värdeneutralt när kalkylen är ifylld
+    (regressionen opåverkad), tankstreck i stället för felkod när den är tom.
+    Nyckeltal som blir 0/vilseledande text i tom mall ("0 kr/år", "MV",
+    "✗ Nedskrivningsrisk", "Typ: Befintligt") guardas med Indata!$R$31=0."""
+    for sheet, refs in _EMPTY_STATE_CELLS.items():
+        ws = wb[sheet]
+        for ref in refs:
+            v = ws[ref].value
+            if isinstance(v, str) and v.startswith("=") and \
+                    not v.upper().startswith("=IFERROR("):
+                ws[ref].value = f'=IFERROR({v[1:]},"–")'
+
+    def guard(ws, refs):
+        for ref in refs:
+            v = ws[ref].value
+            if isinstance(v, str) and v.startswith("=") and "$R$31=0" not in v:
+                ws[ref].value = f'=IF(Indata!$R$31=0,"–",{v[1:]})'
+
+    guard(wb["Översikt"], ["B8", "E8", "H8", "H9", "J13", "J14", "J15",
+                           "B24", "E24", "H24"])
+    guard(wb["Resultat"], ["C14", "D14", "E14", "C15", "D15", "E15",
+                           "C16", "D16", "E16", "C30", "D30"])
+
+    # Översikt-subtiteln började med "· " när projektnamnet var tomt
+    ov = wb["Översikt"]
+    ov["B4"] = ('=IF(Indata!B26="","Kalkylstart "&Indata!C5,'
+                'Indata!B26&" · Kalkylstart "&Indata!C5)')
+
+    # Försättsblad: auto-fält som visade 0/"Befintligt" i tom mall
+    fs = wb["Försättsblad"]
+    fs["C8"] = '=IF(Indata!B26="","–",Indata!B26)'
+    fs["H11"] = '=IF(Indata!F31=0,"–",Indata!F31)'
+    fs["H12"] = ('=IF(Indata!C26="","–",IF(Indata!C26="Nyb","Nybyggnad",'
+                 'IF(Indata!C26="Omb","Ombyggnad",IF(Indata!C26="Bef",'
+                 '"Befintligt",IF(Indata!C26="Ins","Installationer","Mark")))))')
+    fs["E19"].number_format = '#,##0 "kr/kvm";-#,##0 "kr/kvm";"–"'
+
+    # Indata: objektrad 1 + Summa-raden ska också vara tysta när de är tomma
+    ind = wb["Indata"]
+    for ref in ("F26", "R26"):
+        ind[ref].number_format = '#,##0;-#,##0;""'
+    ind["J26"].number_format = '0.0%;-0.0%;""'
+    for ref in ("D31", "E31", "F31", "R31"):
+        ind[ref].number_format = '#,##0;-#,##0;""'
+
+
 # ── POLISH m2: ett input-språk + validering + bladskydd (D-23/D-24) ────────
 
 # Valideringstyper med svenska felmeddelanden. "text" = ingen typkontroll,
@@ -931,7 +1101,7 @@ _INDATA_INPUTS = [
     (("list", '"Mycket positivt,Något positivt,Neutralt,Något negativt,Mycket negativt"'),
      ["C75", "C76", "C77", "C78"], "Bedömning",
      "Justerar yielden med −0,50 till +0,50 pp per parameter."),
-    ("text", ["E75:E78"], "Motivering", "Kort motivering till bedömningen."),
+    ("text", ["K75:R78"], "Motivering", "Kort motivering till bedömningen."),
 ]
 
 _FORSATTSBLAD_INPUTS = [
@@ -1053,6 +1223,8 @@ def apply_all(wb) -> None:
     round_grafer(wb)
     round_irr_yield_scenarios(wb)
     round_design_final(wb)
+    round_guidance(wb)
+    round_empty_state(wb)
     round_input_language(wb)
     round_print_compact(wb)
     round_sidenav(wb)

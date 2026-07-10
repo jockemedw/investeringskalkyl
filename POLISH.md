@@ -105,3 +105,29 @@ bilden (CopyFromScreen fångade användarens webbläsare).
 
 Kvar till m3: Motivering-kolumnen E75:E78 för smal för text; nollbrus i tomma
 objektrader; öppningsvy/markörposition; nav-pelarens abrupta slut.
+
+## m3 — Vägledning & öppningsvy (2026-07-10)
+
+`round_guidance` + `round_empty_state` i v2_rounds.py; nav-pelaren förlängd i
+`tools/sidenav.py` (min 80 rader).
+
+- **Öppningsvy:** markören landar på första inputfältet (Försättsblad C9,
+  Indata C5 — DV-prompten visas direkt vid öppning), övriga flikar B2. Filen
+  öppnas på Försättsblad. Kassaflöde fryser årshuvud + etikettkolumner (D5).
+- **Ifyllnadsguide på Försättsblad** (G16–G21): SÅ FYLLER DU I 1-2-3 med
+  hyperlänkar till Indata/Resultat, "Blå fält = inmatning"-förklaring och
+  levande nyckelfältsstatus ("Ifyllnad: X av 11 nyckelfält" → "✓ Alla
+  nyckelfält ifyllda"; 'Fyll i'-platshållare räknas som tomma).
+- **Sektion 9 omlagd:** Motivering fick K:R (var 6 enheter smal i E),
+  vägledningstexter F:J.
+- **Nollbrus borta:** tomma objektrader i Indata/Resultat/Kassaflöde visar
+  tomt i stället för 0/0,0 %; "(ej använd)"-kolumnerna alltid tysta.
+- **Tom mall-testet** (kopia, Skola-raden rensad via COM — validerade samtidigt
+  att skyddet släpper igenom ifyllnad): 518 #DIV/0! på presentationsytorna →
+  0. IFERROR-wrap + Indata!$R$31=0-guards ("–" i stället för "0 kr/år",
+  "✗ Nedskrivningsrisk", "MV", "Typ: Befintligt", "Projektnamn 0",
+  "· Kalkylstart"). Motorflikarna lämnas medvetet (fel där är normala mitt i
+  ifyllnad och försvinner med första objektraden).
+- **V1/V2 från m1 löst:** Resultat-hero D14 (#######) → kolumn D 24 enheter;
+  B-etiketterna hela (B 36).
+- Regression grön efter varje bygge.

@@ -117,7 +117,7 @@ def _run_ps(script: str, timeout: int = 300) -> str:
     )
     if res.returncode != 0:
         raise RuntimeError(f"powershell fail:\n{res.stdout}\n{res.stderr}")
-    return res.stdout
+    return res.stdout or ""  # stdout kan intermittent vara None trots exit 0
 
 
 def _sheet_files(src: Path) -> dict[int, str]:
