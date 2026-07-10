@@ -625,20 +625,23 @@ def round_dokumentation_polish(wb) -> None:
 
 # ── V2-07: sidnav med 10 poster ─────────────────────────────────────────────
 
+NAV10 = [
+    ("Försättsblad", "F"),
+    ("Översikt", "Ö"),
+    ("Indata", "I"),
+    ("Kassaflöde", "K"),
+    ("Finansiering", "$"),
+    ("Resultat", "R"),
+    ("Grafer", "G"),
+    ("Lönsamhetskontroll", "L"),
+    ("Beräkningslogik", "Σ"),
+    ("Dokumentation", "D"),
+]
+
+
 def round_sidenav(wb) -> None:
     import tools.sidenav as sidenav
-    sidenav.NAV_ITEMS = [
-        ("Försättsblad", "F"),
-        ("Översikt", "Ö"),
-        ("Indata", "I"),
-        ("Kassaflöde", "K"),
-        ("Finansiering", "$"),
-        ("Resultat", "R"),
-        ("Grafer", "G"),
-        ("Lönsamhetskontroll", "L"),
-        ("Beräkningslogik", "Σ"),
-        ("Dokumentation", "D"),
-    ]
+    sidenav.NAV_ITEMS = NAV10
     paths = sidenav.generate_assets()
     for ws in wb.worksheets:
         for r in range(1, 13):  # rensa replayade nav-länkar/texter (9-postersnav)
@@ -1309,6 +1312,89 @@ def apply_all(wb) -> None:
     round_sheet_protection(wb)
 
 
+def patch_nav_hyperlinks(out_path: Path) -> None:
+    """Hyperlänk PÅ nav-knappbilderna (a:hlinkClick i cNvPr).
+
+    Cell-hyperlänken bakom bilden nås aldrig med mus — bilden fångar klicket,
+    och på skyddade blad är bildobjekt utan egen länk helt döda. openpyxl
+    saknar API för bild-hyperlinks → XML-patch: hlinkClick först i cNvPr +
+    hyperlink-relationship i drawingN.xml.rels. Knapparna identifieras via
+    ankaret (kolumn 0, xdr:row 1–10) — mappningen rad → målflik är densamma
+    på alla flikar (NAV10, START_ROW=2). Aktiv flik länkas också: klick =
+    hoppa till A1 (scrolla till toppen). Excel COM-recalcens omsparning
+    bevarar bild-hyperlinks."""
+    import zipfile
+    import shutil
+
+    NS_R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+    NS_A = "http://schemas.openxmlformats.org/drawingml/2006/main"
+    row_to_sheet = {i + 1: name for i, (name, _) in enumerate(NAV10)}
+
+    with zipfile.ZipFile(out_path) as zin:
+        names = zin.namelist()
+        data_all = {n: zin.read(n) for n in names}
+
+    # OBS namespace-form: openpyxl skriver default-ns UTAN prefix
+    # (<oneCellAnchor>, <cNvPr/>); Excel-omsparning skriver xdr:-prefix.
+    # Mönstren måste matcha båda, och hlinkClick deklarerar xmlns:a inline
+    # (odeklarerat prefix = ogiltig XML som Excel tyst reparerar bort).
+    P = r"(?:xdr:)?"
+    rels_to_add: dict[str, list[tuple[str, str]]] = {}
+    for dname in [n for n in names
+                  if re.fullmatch(r"xl/drawings/drawing\d+\.xml", n)]:
+        added: list[tuple[str, str]] = []
+
+        def _link(m: re.Match) -> str:
+            block = m.group(0)
+            col = re.search(rf"<{P}col>(\d+)</{P}col>", block)
+            row = re.search(rf"<{P}row>(\d+)</{P}row>", block)
+            if (not col or not row or int(col.group(1)) != 0
+                    or not re.search(rf"<{P}pic>", block)):
+                return block
+            sheet = row_to_sheet.get(int(row.group(1)))
+            if sheet is None:
+                return block
+            rid = f"navHl{row.group(1)}"
+            hl = (f'<a:hlinkClick xmlns:a="{NS_A}" xmlns:r="{NS_R}" '
+                  f'r:id="{rid}"/>')
+            # hlinkClick måste vara första barnet i cNvPr (schemaordning)
+            if re.search(rf"<{P}cNvPr[^>]*/>", block):
+                block = re.sub(rf"(<({P})cNvPr[^>]*?)\s*/>",
+                               r"\1>" + hl + r"</\2cNvPr>", block, count=1)
+            else:
+                block = re.sub(rf"(<{P}cNvPr[^>]*>)", r"\1" + hl,
+                               block, count=1)
+            added.append((rid, sheet))
+            return block
+
+        text = data_all[dname].decode("utf-8")
+        new_text = re.sub(
+            rf"<{P}oneCellAnchor>.*?</{P}oneCellAnchor>"
+            rf"|<{P}twoCellAnchor>.*?</{P}twoCellAnchor>",
+            _link, text, flags=re.S)
+        if added:
+            data_all[dname] = new_text.encode("utf-8")
+            relname = dname.replace("xl/drawings/", "xl/drawings/_rels/") + ".rels"
+            rels_to_add[relname] = added
+
+    if not rels_to_add:
+        return
+    for relname, added in rels_to_add.items():
+        ins = "".join(
+            f'<Relationship Id="{rid}" Type="{NS_R}/hyperlink" '
+            f"Target=\"#'{sheet}'!A1\" TargetMode=\"External\"/>"
+            for rid, sheet in added)
+        rtext = data_all[relname].decode("utf-8")
+        data_all[relname] = rtext.replace(
+            "</Relationships>", ins + "</Relationships>").encode("utf-8")
+
+    tmp = out_path.with_suffix(".xlsx.tmp")
+    with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
+        for n in names:
+            zout.writestr(n, data_all[n])
+    shutil.move(tmp, out_path)
+
+
 def post_save(out_path: Path) -> None:
     """Körs på den sparade filen (XML-nivå) efter save + summaryBelow-patch.
 
@@ -1317,6 +1403,8 @@ def post_save(out_path: Path) -> None:
     trianglarna är bara visuellt brus. openpyxl saknar API för ignoredErrors
     → direkt XML-patch. sheetN.xml slås upp via workbook-rels (skapandeordning
     ≠ flikordning)."""
+    patch_nav_hyperlinks(out_path)
+
     import zipfile
     import shutil
 
