@@ -131,3 +131,23 @@ objektrader; öppningsvy/markörposition; nav-pelarens abrupta slut.
 - **V1/V2 från m1 löst:** Resultat-hero D14 (#######) → kolumn D 24 enheter;
   B-etiketterna hela (B 36).
 - Regression grön efter varje bygge.
+
+## m4 — Design-excellens (2026-07-10)
+
+Granskningsvarv 1 (25 vyer) → fyra fynd → `round_m4_polish` + ignoredErrors:
+
+- Översikt: krav 3-etiketten klipptes mot statuschipen → "MV år 20 ≥ bokfört
+  värde". Försättsblad: flödesstegen 2–3 fick länkutseende (understrykning);
+  "Marknadsvärde, senaste värdering" → "Senaste marknadsvärde" (klipptes).
+- Lönsamhetskontroll: B 34 / F 12 ("…vid bindande kravhyr|", "⚠ IRR<krav"
+  klipptes). Gröna felkontrollstrianglar i scenariotabellen släckta via
+  `<ignoredErrors>`-XML-patch i `post_save` (openpyxl saknar API;
+  numberStoredAsText + formula; Excel bevarar elementet vid recalc-save).
+- Dokumentation: lösryckta kantlinjefragment i C:V rensade.
+
+**Verifiering efter sista ändringen:** två hela skärmdumpsvarv (25 vyer × 2).
+Varv 1 vision-granskat — inga nya fynd. Varv 2 pixeldiffat mot varv 1: alla
+diffar låg i menyfliksområdet (y ≤ 187), arken pixelidentiska; vision-stickprov
+rena. Programmatisk interaktionskontroll grön: skyddsmatris, 51 valideringar,
+olåsta inputceller, öppningsmarkörer (C9/C5/D5/D6/B2), Kassaflöde-freeze D5,
+aktiv flik Försättsblad. Regression grön.

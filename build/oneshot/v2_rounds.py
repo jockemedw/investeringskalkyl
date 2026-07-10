@@ -1206,6 +1206,35 @@ def round_sheet_protection(wb) -> None:
         ws.protection.formatRows = True
 
 
+# ── POLISH m4: design-excellens — fynd från skärmgranskningsvarv 1 ──────────
+
+def round_m4_polish(wb) -> None:
+    """POLISH m4: (1) Översikt krav 3-etiketten klipptes mot statuschipen;
+    (2) Försättsbladets flödessteg 2–3 är hyperlänkar men såg ut som text;
+    (3) FS 'Marknadsvärde, senaste värdering' klipptes mot inputfältet;
+    (4) Lönsamhetskontroll: B för smal ('…vid bindande kravhyr|'), F för smal
+    ('⚠ IRR<krav' klipptes i MV-scenariotabellen); (5) Dokumentation: lösryckta
+    kantlinjefragment i C:V — rester av unmergade sektionsunderstrykningar."""
+    ov = wb["Översikt"]
+    ov["H15"] = "3.  MV år 20 ≥ bokfört värde"
+
+    fs = wb["Försättsblad"]
+    for ref in ("G18", "G19"):
+        f = fs[ref].font
+        fs[ref].font = Font(name=f.name, size=f.size, color=INK, underline="single")
+    fs["B40"] = "Senaste marknadsvärde"
+
+    lk = wb["Lönsamhetskontroll"]
+    lk.column_dimensions["B"].width = 34
+    lk.column_dimensions["F"].width = 12
+
+    dok = wb["Dokumentation"]
+    for row in dok.iter_rows(min_col=3, max_col=22):
+        for c in row:
+            if c.border and (c.border.bottom.style or c.border.top.style):
+                c.border = Border()
+
+
 # ── Pipeline ────────────────────────────────────────────────────────────────
 
 def apply_all(wb) -> None:
@@ -1230,11 +1259,60 @@ def apply_all(wb) -> None:
     round_sidenav(wb)
     # OBS: polish sist — sidenav sätter radhöjd 30 på rad 2–11 på ALLA flikar,
     # vilket klipper H1-nedstaplar (Översikt 36pt, Försättsblad 42pt)
+    round_m4_polish(wb)
     round_print_polish(wb)
     # Skyddet allra sist: inga rundor ska behöva skriva i en "låst" bok
     round_sheet_protection(wb)
 
 
 def post_save(out_path: Path) -> None:
-    """Körs på den sparade filen (XML-nivå) efter save + summaryBelow-patch."""
-    pass
+    """Körs på den sparade filen (XML-nivå) efter save + summaryBelow-patch.
+
+    ignoredErrors: MV-scenariotabellens rader (Lönsamhetskontroll 54–60) får
+    gröna felkontrollstrianglar ('inkonsekvent formel') — medvetna formler,
+    trianglarna är bara visuellt brus. openpyxl saknar API för ignoredErrors
+    → direkt XML-patch. sheetN.xml slås upp via workbook-rels (skapandeordning
+    ≠ flikordning)."""
+    import zipfile
+    import shutil
+
+    IGNORE = {"Lönsamhetskontroll": "B54:F60 C86:E86"}
+
+    with zipfile.ZipFile(out_path) as z:
+        wbxml = z.read("xl/workbook.xml").decode("utf-8")
+        rels = z.read("xl/_rels/workbook.xml.rels").decode("utf-8")
+    rid_to_file = {}
+    for rel in re.findall(r"<Relationship\b[^>]*>", rels):
+        rid = re.search(r'Id="(rId\d+)"', rel)
+        tgt = re.search(r'Target="(?:/xl/)?worksheets/([^"]+)"', rel)
+        if rid and tgt:
+            rid_to_file[rid.group(1)] = tgt.group(1)
+    name_to_file = {}
+    for m in re.finditer(r'<sheet[^>]*name="([^"]+)"[^>]*r:id="(rId\d+)"', wbxml):
+        name_to_file[m.group(1)] = rid_to_file.get(m.group(2))
+
+    targets = {f"xl/worksheets/{name_to_file[n]}": sqrefs
+               for n, sqrefs in IGNORE.items() if name_to_file.get(n)}
+    if not targets:
+        return
+    tmp = out_path.with_suffix(".xlsx.tmp")
+    with zipfile.ZipFile(out_path, "r") as zin, \
+         zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
+        for item in zin.namelist():
+            data = zin.read(item)
+            if item in targets:
+                text = data.decode("utf-8")
+                ies = "".join(
+                    f'<ignoredError sqref="{s}" formula="1" formulaRange="1" '
+                    f'numberStoredAsText="1"/>'
+                    for s in targets[item].split())
+                block = f"<ignoredErrors>{ies}</ignoredErrors>"
+                # Schemaordning (CT_Worksheet): ignoredErrors efter colBreaks,
+                # före drawing/legacyDrawing — annars "reparerar" Excel filen
+                for anchor in ("<drawing ", "<legacyDrawing ", "</worksheet>"):
+                    if anchor in text:
+                        text = text.replace(anchor, block + anchor, 1)
+                        break
+                data = text.encode("utf-8")
+            zout.writestr(item, data)
+    shutil.move(tmp, out_path)
