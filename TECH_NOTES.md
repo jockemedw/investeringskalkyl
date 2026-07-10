@@ -289,6 +289,36 @@ investeringskalkyl/
     └── iter8.xlsx
 ```
 
+## §9 — POLISH-fasens fallgropar (2026-07-10)
+
+1. **Excel målar aldrig om rutnätet vid programmatisk scroll i bakgrundsfönster.**
+   ScrollRow/Goto/Range.Select uppdaterar modellen (VisibleRange ändras) men
+   pixlarna förblir öppningsvyn; zoom-ändringar målar däremot om. Lösning i
+   `screenshot_sheets.py`: baka in scrollpositionen i en temporär kopia via
+   XML-patch av sheetView/pane@topLeftCell (vid ren kolumnfrys styr
+   sheetView@topLeftCell radscrollen — pane@topLeftCell räcker inte), så
+   öppningsritningen hamnar rätt. Fönstret fångas med PrintWindow
+   (PW_RENDERFULLCONTENT) — fungerar bakom andra fönster, stjäl inte fokus.
+
+2. **PowerShell-stdout kan bli None trots exit 0.** OEM-kodade å/ä/ö i PS-output
+   kraschar subprocess-lästråden (UnicodeDecodeError i tråd → res.stdout=None)
+   — ser ut som intermittent flakiness. Fix: `[Console]::OutputEncoding = UTF8`
+   i PS-skriptet + `encoding="utf-8", errors="replace"` i subprocess.run.
+   Kritisk data går via fil, inte stdout.
+
+3. **openpyxl rapporterar fantombredd 13 för intervall-lagrade kolumner.**
+   Excel skriver `<col min="3" max="5" width="18"/>` — openpyxl expanderar inte
+   intervallet vid läsning; `column_dimensions['D']` ger en NY dimension med
+   defaultbredd 13. Läs XML:en vid tvivel.
+
+4. **ignoredErrors saknar openpyxl-API.** Gröna felkontrollstrianglar släcks
+   via XML-patch i `post_save` (v2_rounds): `<ignoredErrors>` efter colBreaks
+   i schemaordningen (före drawing). Excel bevarar elementet vid recalc-save.
+
+5. **xlsx-bladskydd blockerar outline-expandering** (D-24). COM:s
+   EnableOutlining/UserInterfaceOnly persisteras inte i ren xlsx → flikar med
+   kollapsade block lämnas oskyddade.
+
 ---
 
 *Slut på tekniska anteckningar.*

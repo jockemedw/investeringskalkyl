@@ -84,7 +84,8 @@ try {
         $last = 1
         $found = $ws.Cells.Find('*', $ws.Cells.Item(1,1), -4123, 2, 1, 2)
         if ($found) { $last = $found.Row }
-        Write-Output "MEASURE|$($ws.Name)|$i|$last|$vis"
+        # Till fil, inte stdout — subprocess-pipen tappar intermittent output
+        Add-Content -Path '__MEASURE__' -Value "MEASURE|$($ws.Name)|$i|$last|$vis" -Encoding UTF8
     }
     $wb.Close($false)
 } finally {
@@ -111,13 +112,17 @@ try {
 
 
 def _run_ps(script: str, timeout: int = 300) -> str:
+    # encoding + errors: OEM-kodade å/ä/ö i PS-output kraschar annars
+    # subprocess-lästråden → stdout None trots exit 0 (rotorsaken bakom
+    # de "intermittenta" tomma svaren)
     res = subprocess.run(
         ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
         timeout=timeout, capture_output=True, text=True,
+        encoding="utf-8", errors="replace",
     )
     if res.returncode != 0:
         raise RuntimeError(f"powershell fail:\n{res.stdout}\n{res.stderr}")
-    return res.stdout or ""  # stdout kan intermittent vara None trots exit 0
+    return res.stdout or ""
 
 
 def _sheet_files(src: Path) -> dict[int, str]:
@@ -171,10 +176,15 @@ def screenshot(xlsx: Path, out_dir: Path, sheets: list[str] | None = None,
     xlsx = xlsx.resolve()
     ps_sheets = ", ".join(f"'{s}'" for s in (sheets or []))
 
-    out1 = _run_ps(PS_PASS1
-                   .replace("__XLSX__", str(xlsx))
-                   .replace("__OUT__", str(out_dir))
-                   .replace("__SHEETS__", ps_sheets), timeout)
+    measure_file = out_dir / "_measure.txt"
+    measure_file.unlink(missing_ok=True)
+    _run_ps(PS_PASS1
+            .replace("__XLSX__", str(xlsx))
+            .replace("__OUT__", str(out_dir))
+            .replace("__MEASURE__", str(measure_file))
+            .replace("__SHEETS__", ps_sheets), timeout)
+    out1 = measure_file.read_text(encoding="utf-8-sig") if measure_file.exists() else ""
+    measure_file.unlink(missing_ok=True)
 
     # MEASURE|namn|index|lastRow|visRows
     pages: dict[int, dict] = {}  # sida k -> {sheet_index: (namn, rad)}

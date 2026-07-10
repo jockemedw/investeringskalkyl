@@ -7,7 +7,7 @@ tags: [python, openpyxl, excel, fastigheter]
 
 ## Läge (2026-07-10)
 
-**Produkten är klar för granskning:** `build/oneshot/Investeringskalkyl_v2.xlsx` — 10 flikar, regression grön (11 631 221,72 kr/år / 7,6452 % / +1,35 pp), hela boken skriver ut på 18 sidor (trogen-PDF-verifierad). Slutrapport i [FINAL.md](FINAL.md). Main är redo att pushas (Joakim pushar efter granskning).
+**Produkten är klar för granskning:** `build/oneshot/Investeringskalkyl_v2.xlsx` — 10 flikar, regression grön (11 631 221,72 kr/år / 7,6452 % / +1,35 pp), 18 print-sidor (trogen-PDF-verifierad). ONESHOT-POLISH klar: ett blått input-språk med 51 svenska valideringar, bladskydd med Tab-vandring, öppningsvyer, ifyllnadsguide + status, ren tom mall. Slutrapporter i [FINAL.md](FINAL.md) och [POLISH.md](POLISH.md). Main är redo att pushas (Joakim pushar efter granskning).
 
 ## Uppgifter
 - [x] Iter 8 baseline — kravhyra 11,6 Mkr, IRR EK 7,65 %, marginal +1,35 pp
@@ -16,6 +16,7 @@ tags: [python, openpyxl, excel, fastigheter]
 - [x] FINAL m1 — utskriftsformat v2: 31 → 18 sidor, all data kvar (D-22)
 - [x] FINAL m2 — Faktisk IRR EK per yield-scenario + timing-fix MV-exit (D-20, D-21)
 - [x] FINAL m3 — design-excellens-pass, 2 hela PDF-granskningsvarv
+- [x] POLISH m1–m5 — ifyllnadsupplevelsen: input-språk, validering, bladskydd, öppningsvyer, tom mall, 2 skärm-granskningsvarv (D-23–D-25)
 - [ ] Joakim: granska + pusha main till origin
 
 ## Anteckningar

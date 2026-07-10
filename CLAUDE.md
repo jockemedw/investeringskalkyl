@@ -3,7 +3,7 @@
 Ersättare för LM 371 Investeringskalkyl. Ren xlsx (inga makron), 10 flikar, 20-årig kalkyl.
 Beställare: Lejonfastigheter AB (kommunalt fastighetsbolag, Linköping).
 
-**Aktuell produkt:** `build/oneshot/Investeringskalkyl_v2.xlsx` (v2 ersätter iter9, byggd från spec-replay + rundor). Utskrift: 18 sidor för hela boken, trogen-PDF-verifierad.
+**Aktuell produkt:** `build/oneshot/Investeringskalkyl_v2.xlsx` (v2 ersätter iter9, byggd från spec-replay + rundor). Utskrift: 18 sidor för hela boken, trogen-PDF-verifierad. Ifyllnadsupplevelse (ONESHOT-POLISH): blått input-språk med svenska valideringar, bladskydd utan lösenord, öppningsvyer, ren tom mall (D-23–D-25).
 
 ## Aktuell baseline (iter 8 → v2 reproducerar exakt)
 
@@ -70,6 +70,7 @@ För ny §10-uppgift: lägg till `round_*(wb)` i [build/oneshot/v2_rounds.py](bu
 
 Status (senaste rad = överst):
 
+- [x] **ONESHOT-POLISH klar (2026-07-10):** ifyllnadsupplevelsen på skärm — ett blått input-språk (51 svenska valideringar), bladskydd med Tab-vandring (outline-flikar undantagna, D-24), öppningsvy per flik + ifyllnadsguide/status, tom mall utan felkoder, 2 skärm-granskningsvarv + programmatisk interaktionskontroll. Print fortsatt 18 sidor. Se [POLISH.md](POLISH.md), D-23–D-25. Skärmvyer verifieras med `build/oneshot/screenshot_sheets.py`. Ej pushad.
 - [x] **ONESHOT-FINAL klar (2026-07-10):** alla öppna §10-uppgifter stängda — se [FINAL.md](FINAL.md). Ej pushad till origin (Joakim pushar efter granskning).
 - [x] **FINAL m3 (2026-07-10):** design-excellens-pass, 2 hela trogen-PDF-granskningsvarv över alla 18 sidor. Indata sektion 5-mallrader fixade (commit b9bdb2a).
 - [x] **FINAL m2 (2026-07-10):** Faktisk IRR EK per yield-scenario (Lönsamhetskontroll rad 86, dolt EK-cashflow-block rad 89–91). Bedömt == C45 exakt, valideras i regressionsgaten. + D-20: timing-fix i MV-exit-tabellens scenario-IRR (commit a6ab310).

@@ -187,4 +187,12 @@ Beslut som har tagits genom projektet, med motivering. Varje beslut är låst om
 
 ---
 
+## D-25: Öppningsvy-standard och ren tom mall
+**Beslut:** Varje flik sparas med markören på sitt första inputfält (Försättsblad C9, Indata C5, Kassaflöde D5, Finansiering D6) eller B2; filen öppnas på Försättsblad där ifyllnadsflödet börjar (guide 1-2-3 + nyckelfältsstatus i G16:G21). Kassaflöde fryser årshuvud + etikettkolumner (D5). Presentationsytornas formler är IFERROR-wrappade + guardade med Indata!$R$31=0 → "–" när mallen är tom; motorflikarna får visa fel tills första objektraden fyllts i.
+**Motivering:** ONESHOT-POLISH mål 2/5 — öppningsupplevelsen och tom mall-testet (518 #DIV/0! utan guards). Guards är värdeneutrala när kalkylen är ifylld (regression opåverkad).
+**Konsekvens:** Nya beräkningsceller på presentationsflikarna bör följa guard-mönstret. Skärmvyer verifieras med `build/oneshot/screenshot_sheets.py` (PrintWindow + topLeftCell-patch) — inte render_local/xlsx-review.
+**Verifierat:** Tom mall-test på kopia via COM, 0 felkoder på presentationsytorna (POLISH m3, 2026-07-10).
+
+---
+
 *Lägg till nya beslut längst ner med löpande nummer. Ändra ALDRIG befintliga — markera som "OMPRÖVAD i D-XX" om de ersätts.*

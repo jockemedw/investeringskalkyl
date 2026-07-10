@@ -22,6 +22,7 @@ BOOK_PDF = XLSX.parent / "print_preview.pdf"
 
 PS = f"""
 $ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $excel = New-Object -ComObject Excel.Application
 $excel.Visible = $false
 $excel.DisplayAlerts = $false
@@ -46,8 +47,11 @@ try {{
 }}
 """
 
+# encoding + errors: PS-konsolen emitterar annars OEM-kodade å/ä/ö som
+# kraschar subprocess-lästråden → res.stdout blir None (intermittent!)
 res = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", PS],
-                     timeout=300, capture_output=True, text=True)
+                     timeout=300, capture_output=True, text=True,
+                     encoding="utf-8", errors="replace")
 if res.returncode != 0:
     print(res.stdout)
     print(res.stderr)

@@ -151,3 +151,35 @@ diffar låg i menyfliksområdet (y ≤ 187), arken pixelidentiska; vision-stickp
 rena. Programmatisk interaktionskontroll grön: skyddsmatris, 51 valideringar,
 olåsta inputceller, öppningsmarkörer (C9/C5/D5/D6/B2), Kassaflöde-freeze D5,
 aktiv flik Försättsblad. Regression grön.
+
+## m5 — Slutrapport ONESHOT-POLISH (2026-07-10)
+
+**Mål uppnått:** filen öppnas på Försättsblad med markören i första inputfältet
+och en levande DV-prompt; blå fält + hårlinje är den enda "fyll i här"-signalen
+i hela boken; varje inputfält har svensk prompt och svenskt felmeddelande; Tab
+vandrar mellan fälten; formler kan inte skrivas sönder; ifyllnadsguiden 1-2-3
+med status leder genom flödet; en helt tom mall visar "–" i stället för
+518 felkoder.
+
+**Grindar:**
+- Regression grön i varje milstolpe (11 631 221,72 / 7,6452 % / +1,35 pp +
+  IRR-scenariomatch).
+- Print: trogen PDF fortsatt **18 sidor** (== FINAL-baslinjen), inga ####,
+  ingen kapad text; blå inputfält skriver ut korrekt (visar ifyllnadsytor
+  även på papper). OBS: Pages.Count rapporterar 14 — den ljuger fortsatt,
+  PDF:en är sanningen.
+
+**Before/after:** [docs/polish/](docs/polish/) — Indata (omärkt hyresobjekts-
+tabell → blått input-språk), Resultat (#######-hero → hel), Försättsblad
+(anonym → guide + status), tom mall-Översikt ("–" i stället för felkaskad).
+
+**Kvarstående begränsningar (medvetna):**
+- Lönsamhetskontroll/Beräkningslogik är oskyddade (D-24: xlsx-skydd dödar
+  outline-expandering; kollapsade block är del av designen).
+- Motorflikarna visar #DIV/0! i HELT tom mall tills första objektraden fylls i
+  (normalt mitt-i-ifyllnad-tillstånd; presentationsytorna är rena).
+- Grafer har ett synligt tomrum mellan diagram 1 och 2 på skärm (chart-ankare
+  är print-kalibrerade; flytt riskerar 1-sidslayouten — inte värt det).
+- FS "Summa investering 15 000 kvm" räknar in mark-arean (LM 371-arv, D-14).
+
+**Redo att pusha** (Joakim granskar först; inget pushat till origin).
