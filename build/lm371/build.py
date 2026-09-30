@@ -211,7 +211,8 @@ def main() -> int:
     ops = ([{"op": "clear", "sheet": KD, "ref": "AC1:AP20"}]
            + ops_restvarde() + ops_matris() + ops_bef() + ops_kanslighet() + ops_kravhyra() + ops_fas2()
            + ops_historik()
-           + [{"op": "goto", "sheet": KD, "ref": "A1"}, {"op": "goto", "sheet": FS, "ref": "A1"}])
+           + [{"op": "goto", "sheet": IRR, "ref": "A1"}, {"op": "goto", "sheet": NPV, "ref": "A1"},
+              {"op": "goto", "sheet": KD, "ref": "A1"}, {"op": "goto", "sheet": FS, "ref": "A1"}])
     print("Baslinje källa …", end=" ")
     check_source_baseline(SOURCE)
     print("ok")

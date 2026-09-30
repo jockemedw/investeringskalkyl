@@ -223,7 +223,8 @@ def check_fas2(v3: Path) -> None:
            kd("P6", 1000),                                         # F4: tomträttsavgäld
            kd("H34", 100), kd("L34", 0.1),                         # F6: kostnadshöjning viktad
            probe(NPV, "D13"), probe(NPV, "E13"), probe(NPV, "F13"), probe(KD, "X23"), probe(KD, "W23"),
-           probe(NPV, "D28"), probe(NPV, "E28"), probe(KD, "L39"), probe(KD, "I34"), probe(KD, "I39")]
+           probe(NPV, "D28"), probe(NPV, "E28"), probe(KD, "L39"), probe(KD, "I34"), probe(KD, "I39"),
+           probe(IRR, "D26"), probe(IRR, "E26"), probe(IRR, "F26")]
     res = run(v3, ops)
     p = lambda s, r: _p(res, s, r)  # noqa: E731
     fails = []
@@ -233,6 +234,8 @@ def check_fas2(v3: Path) -> None:
         fails.append(f"F1 år 2 Bef-intäkt {p(NPV, 'E13')} != 3 042 000 (^1)")
     if not _close(p(NPV, "F13"), 2000 * 1500 * 1.014 ** 2, 0.5):
         fails.append(f"F1 år 3 Bef-intäkt {p(NPV, 'F13')} (^2)")
+    if not (_close(p(IRR, "E26") / p(IRR, "D26"), 1.02, 1e-9) and _close(p(IRR, "F26") / p(IRR, "E26"), 1.02, 1e-9)):
+        fails.append(f"F2 CA-index år1→2→3: {p(IRR, 'D26')}, {p(IRR, 'E26')}, {p(IRR, 'F26')} (förväntat ×1,02 per år)")
     if not _close(p(KD, "X23"), p(KD, "W23"), 0.5):
         fails.append(f"F3 PV investering {p(KD, 'X23')} != {p(KD, 'W23')} vid avslut före kalkylstart")
     if not (_close(p(NPV, "D28"), -1000, 0.5) and _close(p(NPV, "E28"), -1000, 0.5)):

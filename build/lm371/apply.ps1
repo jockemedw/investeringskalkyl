@@ -27,6 +27,7 @@ try {
             "fmt_from"   { $ws.Range([string]$o.src).Copy() | Out-Null; $ws.Range([string]$o.dst).PasteSpecial(-4122) | Out-Null }
             "merge"      { $ws.Range($ref).Merge() | Out-Null }
             "clear"      { $ws.Range($ref).Clear() | Out-Null }
+            "clear_contents" { $ws.Range($ref).ClearContents() | Out-Null }
             "clear_fmt"  { $ws.Range($ref).ClearFormats() | Out-Null }
             "replace"    { $ws.Range($ref).Replace([string]$o.find, [string]$o.repl, 2) | Out-Null }
             "dv_list"    { $r = $ws.Range($ref); $r.Validation.Delete(); $r.Validation.Add(3, 1, 1, [string]$o.source) | Out-Null; $r.Validation.InCellDropdown = $true }

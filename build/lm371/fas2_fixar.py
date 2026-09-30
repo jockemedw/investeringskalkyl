@@ -61,7 +61,7 @@ def ops_fas2() -> list[dict]:
     for ref in ("C6", "C7", "C8", "C9"):
         o.append(_set(IRR, ref, f=_mround_to_round(irr[ref].value)))
     # F6 — #REF!
-    o += [{"op": "clear", "sheet": IRR, "ref": "D10:BA10"},
+    o += [{"op": "clear_contents", "sheet": IRR, "ref": "D10:BA10"},      # behåll bandets format (synlig rad)
           {"op": "clear", "sheet": GRAF, "ref": "54:54"},
           {"op": "clear", "sheet": GRAF, "ref": "XFD45"}, {"op": "clear", "sheet": GRAF, "ref": "XFD53"},
           {"op": "clear", "sheet": GRAF, "ref": "XFD55"},
