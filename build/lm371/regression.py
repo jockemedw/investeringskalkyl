@@ -145,7 +145,7 @@ def check_sensitivity(v3: Path) -> None:
     """Bedömt-scenariot == rad 37/D40/E82 bit-för-bit; opt > bedömt > pess; flik 1 speglar flik 5."""
     ops = [probe(IRR, "D40"), probe(IRR, "E55"), probe(IRR, "E56"), probe(IRR, "E57"),
            probe(IRR, "F55"), probe(IRR, "F56"), probe(IRR, "F57"), probe(IRR, "D56"), probe(IRR, "C10"),
-           probe(NPV, "E82"), probe("1. Framskrivningsunderlag", "D68"), probe("1. Framskrivningsunderlag", "G107"),
+           probe(NPV, "E82"), probe("1. Framskrivningsunderlag", "D68"), probe("1. Framskrivningsunderlag", "G108"),
            scan(IRR, "B53:G57"), scan(IRR, "D59:BA61"), scan("1. Framskrivningsunderlag", "B64:G70")]
     res = run(v3, ops)
     fails = []
@@ -161,8 +161,8 @@ def check_sensitivity(v3: Path) -> None:
         fails.append("NPV-ordning opt > bedömt > pess bruten")
     if _p(res, "1. Framskrivningsunderlag", "D68") != _p(res, IRR, "E56"):
         fails.append("flik 1 bedömt-IRR speglar inte flik 5")
-    if not _close(_p(res, "1. Framskrivningsunderlag", "G107"), _p(res, NPV, "E82"), 0.5):
-        fails.append("flik 1 NPV-rad (flyttad 100→107) pekar fel efter radinfogning")
+    if not _close(_p(res, "1. Framskrivningsunderlag", "G108"), _p(res, NPV, "E82"), 0.5):
+        fails.append("flik 1 NPV-rad (flyttad 100→108) pekar fel efter radinfogning")
     for k, n in res["errors"].items():
         if n:
             fails.append(f"felvärden i {k}: {n}")
@@ -172,6 +172,37 @@ def check_sensitivity(v3: Path) -> None:
           f"NPV {_p(res, IRR, 'F55'):,.0f} / {_p(res, IRR, 'F56'):,.0f} / {_p(res, IRR, 'F57'):,.0f} ✓")
 
 
+def check_kravhyra(v3: Path) -> None:
+    """Kravhyran är exakt: insatt som hyra klarar båda kraven med liten marginal, och det bindande kravet ligger på gränsen."""
+    res = run(v3, [probe(KD, "D17"), probe(KD, "V23"), probe(KD, "AE19"), probe(KD, "AD19"), probe(KD, "AD20"),
+                   probe(KD, "AD15"), probe(KD, "AD16"), probe(KD, "AE15"), probe(KD, "AE16"),
+                   probe(IRR, "H55"), probe(IRR, "H56"), probe(IRR, "H57"), probe("1. Framskrivningsunderlag", "G107")])
+    krav = _p(res, KD, "V23")
+    fails = []
+    if not (isinstance(krav, (int, float)) and 0 < krav < 2650):
+        fails.append(f"kravhyra orimlig: {krav} (exemplet klarar kraven vid 2 650)")
+    if _p(res, KD, "D17") != krav:
+        fails.append("D17 (viktad) != V23 vid ett objekt")
+    if not (_p(res, IRR, "H55") < _p(res, IRR, "H56") < _p(res, IRR, "H57")):
+        fails.append("kravhyra per scenario ej stigande opt < bedömt < pess")
+    if _p(res, "1. Framskrivningsunderlag", "G107") != _p(res, KD, "D17"):
+        fails.append("flik 1 kravhyra speglar inte D17")
+    if _p(res, KD, "AD16") <= _p(res, KD, "AD15") or _p(res, KD, "AE16") <= _p(res, KD, "AE15"):
+        fails.append(f"datatabellen saknar lutning: {res['probes']}")
+    if fails:
+        raise AssertionError("KRAVHYRA RÖD:" + chr(10) + "  - " + (chr(10) + "  - ").join(fails))
+    # insatt kravhyra → båda kraven klaras, det bindande ligger nära gränsen
+    res2 = run(v3, [{"op": "set", "sheet": KD, "ref": "I23", "value": float(krav)},
+                    probe(KD, "D13"), probe(KD, "D14"), probe(KD, "F14")])
+    npv, irr, kravirr = _p(res2, KD, "D13"), _p(res2, KD, "D14"), _p(res2, KD, "F14")
+    ok_npv, ok_irr = npv >= -1, irr >= kravirr - 1e-5
+    tight = npv < 300 or irr < kravirr + 0.0005            # CEILING till hel kr/kvm ger liten marginal
+    if not (ok_npv and ok_irr and tight):
+        raise AssertionError(f"KRAVHYRA RÖD: vid {krav} kr/kvm NPV={npv} tkr, IRR={irr:.4%} (krav {kravirr:.2%})")
+    print(f"  kravhyra {krav:,.0f} kr/kvm ({_p(res, KD, 'AE19')}) → NPV {npv:,.0f} tkr, IRR {irr:.3%}; "
+          f"scenarier {_p(res, IRR, 'H55'):,.0f}/{_p(res, IRR, 'H56'):,.0f}/{_p(res, IRR, 'H57'):,.0f} ✓")
+
+
 def run_all(v3: Path, res: dict | None = None) -> None:
     check_v3(res if res is not None else run(v3, PROBES))
     check_legacy_weights(v3)
@@ -179,6 +210,7 @@ def run_all(v3: Path, res: dict | None = None) -> None:
     check_empty_matrix(v3)
     check_bef(v3)
     check_sensitivity(v3)
+    check_kravhyra(v3)
     print("REGRESSION GRÖN")
 
 

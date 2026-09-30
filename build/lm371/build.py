@@ -189,11 +189,12 @@ def ops_matris() -> list[dict]:
 def main() -> int:
     from step4_bef import ops_bef
     from step5_kanslighet import ops_kanslighet
+    from step6_kravhyra import ops_kravhyra
     from regression import PROBES, check_source_baseline, run_all
     # gamla fem rutorna rensas FÖRST — hjälpområdet AC4:AC9 återanvänds för dropdown-skalan.
     # goto sist: flik 2 öppnas på rad 1, boken öppnas på flik 1.
     ops = ([{"op": "clear", "sheet": KD, "ref": "AC1:AP20"}]
-           + ops_restvarde() + ops_matris() + ops_bef() + ops_kanslighet()
+           + ops_restvarde() + ops_matris() + ops_bef() + ops_kanslighet() + ops_kravhyra()
            + [{"op": "goto", "sheet": KD, "ref": "A1"}, {"op": "goto", "sheet": FS, "ref": "A1"}])
     print("Baslinje källa …", end=" ")
     check_source_baseline(SOURCE)
