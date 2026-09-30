@@ -186,6 +186,19 @@ def ops_matris() -> list[dict]:
     return o
 
 
+def ops_historik() -> list[dict]:
+    """Steg 7: rad i flik 1:s uppdateringshistorik (kol R, dold outline-grupp). Rad 1–23 påverkas
+    inte av radinfogningarna (64–70, 107)."""
+    return [_fmt(FS, "R23", "R24"), _fmt(FS, "S23", "S24"),
+            _set(FS, "R24", v="16. 2026-09-30 v3: Restvärde = rent marknadsvärde vid justerad direktavkastning "
+                             "(flik 2 sektion 5, vikter 0/1/0 på flik 5). Bef-objekt = nollalternativ: krav 1–2 på "
+                             "tillkommande flöde (flik 4 rad 64–82), krav 3 på hela fastigheten, egen avskrivningstid "
+                             "för befintligt bokfört värde. Investeringsspecifikation som matris (sektion 4) styr "
+                             "Budget kr/kvm. Känslighet restvärde ±1,00 pp (flik 5 rad 53–61, flik 1). Kravhyra "
+                             "som output (flik 2 rad 17 / kolumn V, datatabell AC14:AI16)."),
+            _set(FS, "S24", v="Claude/JW")]
+
+
 def main() -> int:
     from step4_bef import ops_bef
     from step5_kanslighet import ops_kanslighet
@@ -195,6 +208,7 @@ def main() -> int:
     # goto sist: flik 2 öppnas på rad 1, boken öppnas på flik 1.
     ops = ([{"op": "clear", "sheet": KD, "ref": "AC1:AP20"}]
            + ops_restvarde() + ops_matris() + ops_bef() + ops_kanslighet() + ops_kravhyra()
+           + ops_historik()
            + [{"op": "goto", "sheet": KD, "ref": "A1"}, {"op": "goto", "sheet": FS, "ref": "A1"}])
     print("Baslinje källa …", end=" ")
     check_source_baseline(SOURCE)

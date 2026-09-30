@@ -3,7 +3,16 @@
 Ersättare för LM 371 Investeringskalkyl. Ren xlsx (inga makron), 10 flikar, 20-årig kalkyl.
 Beställare: Lejonfastigheter AB (kommunalt fastighetsbolag, Linköping).
 
-**Aktuell produkt:** `build/oneshot/Investeringskalkyl_v2.xlsx` (v2 ersätter iter9, byggd från spec-replay + rundor). Utskrift: 18 sidor för hela boken, trogen-PDF-verifierad. Ifyllnadsupplevelse (ONESHOT-POLISH): blått input-språk med svenska valideringar, bladskydd utan lösenord, öppningsvyer, ren tom mall (D-23–D-25).
+**OMTAG 2026-09-30 — aktuell produkt är `build/lm371/LM371_v3.xlsx`:** LM 371-mallen kirurgiskt
+patchad via Excel COM (openpyxl förstör x14-valideringar och diagram). Fas 1 klar: restvärde =
+rent MV vid justerad yield, Bef = nollalternativ, investeringsmatris, känslighet, kravhyra som output.
+Bygg `python build/lm371/build.py` (ops i build.py + step4_bef/step5_kanslighet/step6_kravhyra,
+generisk applier `apply.ps1`, gate `regression.py`). Analys + beslut 1–10: [ANALYS_OMTAG.md](ANALYS_OMTAG.md).
+Lathundstillägg/ändringslogg: [build/lm371/LM371_v3.md](build/lm371/LM371_v3.md). COM-läxor: NumberFormat
+är lokal-känslig här (kopiera format från befintliga celler eller NumberFormatLocal), radinfogning
+flyttar källadresser för senare fmt_from, mallens flik 5 har dold outline-grupp rad 42–49.
+
+**Tidigare produkt (v2, ersättar-spåret, parkerat):** `build/oneshot/Investeringskalkyl_v2.xlsx` (v2 ersätter iter9, byggd från spec-replay + rundor). Utskrift: 18 sidor för hela boken, trogen-PDF-verifierad. Ifyllnadsupplevelse (ONESHOT-POLISH): blått input-språk med svenska valideringar, bladskydd utan lösenord, öppningsvyer, ren tom mall (D-23–D-25).
 
 ## Aktuell baseline (iter 8 → v2 reproducerar exakt)
 
@@ -99,4 +108,8 @@ Status (senaste rad = överst):
 - [x] Round B: pedagogisk omskrivning Beräkningslogik (commit dab830b)
 - [x] Faktisk IRR EK per scenario i känslighetstabellen — klar i FINAL m2 (se ovan, D-21)
 
-Inga öppna §10-uppgifter. Nästa: Joakim granskar + pushar main till origin.
+- [x] **OMTAG fas 1 (2026-09-30):** LM371_v3 steg 1–7 committade (9261d7d → 50c8cf2 + steg 7). Se ANALYS_OMTAG.md.
+- [ ] **OMTAG fas 2:** verifierade formelfixar i LM 371 (år 1-exponent, CA-indexhopp, #REF!-städning); verifiera de tre oklara först.
+- [ ] **OMTAG fas 4 (separat beslut):** helobjektshantering (befintligt driftnetto + bokfört värde).
+
+Nästa: Joakim granskar LM371_v3.xlsx, sedan fas 2.
