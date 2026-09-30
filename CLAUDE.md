@@ -109,7 +109,7 @@ Status (senaste rad = överst):
 - [x] Faktisk IRR EK per scenario i känslighetstabellen — klar i FINAL m2 (se ovan, D-21)
 
 - [x] **OMTAG fas 1 (2026-09-30):** LM371_v3 steg 1–7 committade (9261d7d → 50c8cf2 + steg 7). Se ANALYS_OMTAG.md.
-- [ ] **OMTAG fas 2:** verifierade formelfixar i LM 371 (år 1-exponent, CA-indexhopp, #REF!-städning); verifiera de tre oklara först.
+- [x] **OMTAG fas 2 (2026-09-30):** F1–F6 formelfixar (hyresindex, CA-index, negativ exponent, LOOKUP, MROUND, 16 438 #REF!). Baslinje-IRR flyttad 8,026 → 8,032 % (legacy 6,298 → 6,306 %) av CA-fixen, pinnad i regression.py. Läxa: Range.Replace arbetar mot FormulaLocal — inga ',' eller funktionsnamn i replace-ops (comrun vägrar).
 - [ ] **OMTAG fas 4 (separat beslut):** helobjektshantering (befintligt driftnetto + bokfört värde).
 
-Nästa: Joakim granskar LM371_v3.xlsx, sedan fas 2.
+Nästa: Joakim granskar LM371_v3.xlsx. Fas 3 (kravhyra) ingick i fas 1. Fas 4 = separat beslut.

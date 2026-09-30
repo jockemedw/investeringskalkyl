@@ -23,8 +23,11 @@ IRR = "5. IRR"
 NPV = "4. NPV"
 FIN = "3. Finansiering"
 
-BASE_NPV, BASE_IRR, BASE_PV = 10300.0, 0.0629828143787814, 10300.0
-V3_IRR = 0.0802573957499011          # rent marknadsvärde, exemplets hyra (COM-verifierat 2026-09-30)
+BASE_NPV, BASE_IRR, BASE_PV = 10300.0, 0.0629828143787814, 10300.0   # källmallen (orörd)
+# v3-pinnar. Fas 2 F2 (CA-index ^(år−1) i stället för ^år från år 2) höjer IRR marginellt:
+# rent MV 8,0257 % → 8,0324 %; legacy-vikter 0/0,4/0,6: 6,2983 % → LEGACY_IRR nedan. NPV/PV opåverkade.
+V3_IRR = 0.08032406218316468
+LEGACY_IRR = 0.06306226827590034      # fas 2 F2: källans 6,2983 % + CA-fix (COM 2026-09-30)
 TOL_IRR = 1e-6
 
 PROBES = [probe(KD, "D13"), probe(KD, "D14"), probe(KD, "D15"),
@@ -37,6 +40,11 @@ PROBES = [probe(KD, "D13"), probe(KD, "D14"), probe(KD, "D15"),
 
 def _p(res, sheet, ref):
     return res["probes"][f"{sheet}!{ref}"]
+
+
+def _is_err(v) -> bool:
+    """Excel-felvärden marshalas via COM som Int32 i intervallet −2146826281 … −2146826246."""
+    return isinstance(v, int) and not isinstance(v, bool) and -2146827000 < v < -2146826000
 
 
 def _close(a, b, tol):
@@ -80,9 +88,9 @@ def check_legacy_weights(v3: Path) -> None:
            {"op": "set", "sheet": IRR, "ref": "A8", "value": 0.6},
            probe(KD, "D13"), probe(KD, "D14"), probe(KD, "D15")]
     res = run(v3, ops)
-    assert _close(_p(res, KD, "D14"), BASE_IRR, TOL_IRR), f"Legacy-vikter ger inte dagens IRR: {res}"
+    assert _close(_p(res, KD, "D14"), LEGACY_IRR, TOL_IRR), f"Legacy-vikter ger inte pinnad IRR: {res}"
     assert _close(_p(res, KD, "D13"), BASE_NPV, 1) and _close(_p(res, KD, "D15"), BASE_PV, 1), res
-    print(f"  legacy 0/0,4/0,6 → IRR {_p(res, KD, 'D14'):.6%} = dagens ✓")
+    print(f"  legacy 0/0,4/0,6 → IRR {_p(res, KD, 'D14'):.6%} (källa 6,2983 % + CA-fix) ✓")
 
 
 def check_adjustment(v3: Path) -> None:
@@ -203,6 +211,61 @@ def check_kravhyra(v3: Path) -> None:
           f"scenarier {_p(res, IRR, 'H55'):,.0f}/{_p(res, IRR, 'H56'):,.0f}/{_p(res, IRR, 'H57'):,.0f} ✓")
 
 
+def check_fas2(v3: Path) -> None:
+    """F1 index år 2 för tidigt startat Bef-avtal, F3 ingen inflatering före kalkylstart, F4 LOOKUP,
+    F5 negativa PV utan #NUM!, F6 L39 och inga #REF!-formler kvar."""
+    import openpyxl
+    def kd(ref, v):
+        return {"op": "set", "sheet": KD, "ref": ref, "value": v}
+    ops = [kd("C24", "Befhuset"), kd("E24", "Bef"), kd("F24", 2000), kd("I24", 1500), kd("J24", 0.7),
+           kd("M24", 2020), kd("N24", 2035),                       # F1: avtal startat före kalkylstart
+           kd("R23", 2020), kd("Q23", 2020),                       # F3: produktionsavslut före kalkylstart
+           kd("P6", 1000),                                         # F4: tomträttsavgäld
+           kd("H34", 100), kd("L34", 0.1),                         # F6: kostnadshöjning viktad
+           probe(NPV, "D13"), probe(NPV, "E13"), probe(NPV, "F13"), probe(KD, "X23"), probe(KD, "W23"),
+           probe(NPV, "D28"), probe(NPV, "E28"), probe(KD, "L39"), probe(KD, "I34"), probe(KD, "I39")]
+    res = run(v3, ops)
+    p = lambda s, r: _p(res, s, r)  # noqa: E731
+    fails = []
+    if not _close(p(NPV, "D13"), 2000 * 1500, 0.5):
+        fails.append(f"F1 år 1 Bef-intäkt {p(NPV, 'D13')} != 3 000 000")
+    if not _close(p(NPV, "E13"), 2000 * 1500 * 1.014, 0.5):
+        fails.append(f"F1 år 2 Bef-intäkt {p(NPV, 'E13')} != 3 042 000 (^1)")
+    if not _close(p(NPV, "F13"), 2000 * 1500 * 1.014 ** 2, 0.5):
+        fails.append(f"F1 år 3 Bef-intäkt {p(NPV, 'F13')} (^2)")
+    if not _close(p(KD, "X23"), p(KD, "W23"), 0.5):
+        fails.append(f"F3 PV investering {p(KD, 'X23')} != {p(KD, 'W23')} vid avslut före kalkylstart")
+    if not (_close(p(NPV, "D28"), -1000, 0.5) and _close(p(NPV, "E28"), -1000, 0.5)):
+        fails.append(f"F4 tomträttsavgäld D28/E28 = {p(NPV, 'D28')}/{p(NPV, 'E28')}")
+    if not _close(p(KD, "L39"), 0.1 * p(KD, "I34") / p(KD, "I39"), 1e-9):
+        fails.append(f"F6 L39 {p(KD, 'L39')}")
+    # F5: hyra 0 → negativa PV utan #NUM!
+    res2 = run(v3, [kd("I23", 0), probe(NPV, "C48"), probe(NPV, "E48"), probe(NPV, "E59"), probe(KD, "D13"), probe(IRR, "C10")])
+    for s_, r_ in ((NPV, "C48"), (NPV, "E48"), (NPV, "E59"), (KD, "D13"), (IRR, "C10")):
+        v = _p(res2, s_, r_)
+        if _is_err(v) or not isinstance(v, (int, float)):
+            fails.append(f"F5 {s_}!{r_} = {v!r} vid hyra 0")
+    if not _is_err(_p(res2, NPV, "E48")) and _p(res2, NPV, "E48") >= 0:
+        fails.append("F5 testet exercerar inte negativt PV")
+    # formeltext: fångar tysta Replace-missar (Replace arbetar mot FormulaLocal)
+    wb = openpyxl.load_workbook(v3)
+    for sh, ref, must in ((NPV, "E13", "MAX('2. Kalkyldata'!$M24,$D$4)"), (NPV, "C48", "ROUND(("), (NPV, "E50", "$M$11"),
+                          (NPV, "D28", "$P$5:$R$5,"), (IRR, "C7", "ROUND(("), ("7.Grafer", "C40", "$72)"), (IRR, "E23", "$71)")):
+        fv = wb[sh][ref].value
+        if not (isinstance(fv, str) and must in fv):
+            fails.append(f"formeltext {sh}!{ref} saknar {must!r}: {str(fv)[:90]}")
+    if any("$P$5:$R$6" in str(wb[NPV].cell(28, c).value) for c in range(4, 54)):
+        fails.append("F4 $P$5:$R$6 kvar på rad 28")
+    # F6: inga #REF! i formeltext
+    refs = [(ws.title, c.coordinate) for ws in wb.worksheets for row in ws.iter_rows() for c in row
+            if isinstance(c.value, str) and "#REF!" in c.value]
+    if refs:
+        fails.append(f"F6 #REF!-formler kvar: {len(refs)} t.ex. {refs[:5]}")
+    if fails:
+        raise AssertionError("FAS 2 RÖD:" + chr(10) + "  - " + (chr(10) + "  - ").join(fails))
+    print(f"  fas 2: index ^0/^1/^2 ✓, PV=W före kalkylstart ✓, LOOKUP ✓, hyra 0 → NPV {_p(res2, KD, 'D13'):,.0f} tkr utan #NUM! ✓, 0 #REF! ✓")
+
+
 def run_all(v3: Path, res: dict | None = None) -> None:
     check_v3(res if res is not None else run(v3, PROBES))
     check_legacy_weights(v3)
@@ -211,6 +274,7 @@ def run_all(v3: Path, res: dict | None = None) -> None:
     check_bef(v3)
     check_sensitivity(v3)
     check_kravhyra(v3)
+    check_fas2(v3)
     print("REGRESSION GRÖN")
 
 

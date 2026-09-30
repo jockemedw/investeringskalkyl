@@ -83,7 +83,7 @@ huvudkostnaden för varje punkt ovan och skälet till att insatserna är "liten"
 ## Föreslagen ordning
 
 1. **Fas 1 — baslinje + restvärdesmodell.** Pinna D13/D14/D15. COM-patchskript. Ny ruta flik 2, ompekning 52 celler, vikter 0/1/0, känslighetsrader på flik 5, tabell i "Kontroll restvärde" på flik 1, historikrad. Regression: 0/0,4/0,6 + Neutralt ⇒ dagens siffror.
-2. **Fas 2 — verifierade fixar.** År 1-exponent, CA-index, `#REF!`-städning. Verifiera de tre oklara innan de rörs.
+2. ✅ **Fas 2 — verifierade fixar (2026-09-30).** F1 hyresindex, F2 CA-index, F3 negativ exponent, F4 LOOKUP, F5 MROUND, F6 #REF! — alla sex verifierade i formeltext före fix. Se build/lm371/LM371_v3.md.
 3. **Fas 3 — kravhyra som output.** Multiplikator + datatabell, oavrundade mellanled. Bara om Joakim vill.
 
 ## Beslut tagna 2026-09-30 (Joakim, batch)

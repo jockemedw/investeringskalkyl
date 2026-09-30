@@ -10,6 +10,12 @@ APPLY = HERE / "apply.ps1"
 
 
 def run(source: Path, ops: list[dict], out: Path | None = None) -> dict:
+    # Range.Replace matchar mot FormulaLocal (svenska funktionsnamn, ';' som separator) och
+    # avvisar tyst ersättningar som blir ogiltiga formler. Sök/ersätt får därför varken
+    # innehålla ',' eller funktionsnamn — sätt hela formeln med .Formula i stället.
+    for op in ops:
+        if op.get("op") == "replace" and ("," in op["find"] or "," in op["repl"] or "(" in op["repl"]):
+            raise ValueError(f"replace-op med separator/funktion (fungerar inte mot FormulaLocal): {op}")
     with tempfile.TemporaryDirectory() as td:
         ops_p = Path(td) / "ops.json"
         probes_p = Path(td) / "probes.json"

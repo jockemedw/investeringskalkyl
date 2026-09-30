@@ -107,10 +107,10 @@ def ops_bef() -> list[dict]:
         for r, tmpl in templates.items():
             o.append(_set(NPV, f"{X}{r}", f=_year_formula(tmpl, X)))
         # IRR: central administration på tillkommande area (Bef-arean är nollalternativets kostnad).
-        # Exponenten behålls som i mallen (D utan index, E+ ^rad 14) — CA-indexbuggen rättas i fas 2.
+        # Fas 2 F2: exponent = årsindex − 1 (mallen hade ^0 år 1 och ^2 år 2).
         ca = f"=IF({X}15=\"\",0,-{K}$P$14*('4. NPV'!{X}$8-'4. NPV'!{X}${B_AREA}))"
         if X != "D":
-            ca += f"*(1+{K}$M$9)^'5. IRR'!{X}14"
+            ca += f"*(1+{K}$M$9)^('5. IRR'!{X}14-1)"      # fas 2 F2: år 2 = ^1 (var ^2)
         o.append(_set(IRR, f"{X}26", f=ca))
     # ── NPV-sammanfattning tillkommande (krav 1), 10 år (C) / kalkylperiod (E) — speglar rad 47–59 ──
     idx_dn, idx_rei = B_DN_TILLK - 3, B_REI_TILLK - 3      # HLOOKUP-index i $D$4:$BA$74
@@ -144,7 +144,7 @@ def ops_bef() -> list[dict]:
           {"op": "replace", "sheet": IRR, "ref": "D23:BA23", "find": "$29)", "repl": f"${B_DN_TILLK})"},
           _set(IRR, "B23", v="Driftnetto tillkommande"),
           {"op": "replace", "sheet": GRAF, "ref": "C40:BA40", "find": "$29-", "repl": f"${B_DN_TILLK}-"},
-          {"op": "replace", "sheet": GRAF, "ref": "C40:BA40", "find": "$25),", "repl": f"${B_REI_TILLK}),"},
+          {"op": "replace", "sheet": GRAF, "ref": "C40:BA40", "find": "$25)", "repl": f"${B_REI_TILLK})"},
           _set(GRAF, "B40", v="Driftnetto tillkommande"),
           ]
     return o
