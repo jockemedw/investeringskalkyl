@@ -195,4 +195,12 @@ Beslut som har tagits genom projektet, med motivering. Varje beslut är låst om
 
 ---
 
+## D-26: OMTAG — förbättringarna införs i LM 371-mallen, v2 parkeras
+**Beslut:** Ersättar-spåret (`build/oneshot/Investeringskalkyl_v2.xlsx`) parkeras. De största förbättringarna (restvärdesmodell, Bef som nollalternativ, investeringsmatris, känslighet, kravhyra som output) införs kirurgiskt i LM 371-mallen via Excel COM → `build/lm371/LM371_v3.xlsx`. Tio delbeslut (vikter, kalkylränta restvärde, stegstorlek, kravhyra, inget bladskydd, icke-Bef-rader, placering, Bef = nollalternativ, krav 3 flaggas, egen avskrivningstid) är dokumenterade i [ANALYS_OMTAG.md](ANALYS_OMTAG.md) och upprepas inte här.
+**Motivering:** Joakim 2026-09-30: v2-spåret hade blivit "oändlig administration och justering" utan omedelbar värdeökning; användarna ska känna igen sig i LM 371. openpyxl förstör mallens x14-valideringar, därför COM.
+**Konsekvens:** D-02 (openpyxl-bygge) och D-04–D-06 (egen flikarkitektur) gäller inte LM371_v3. D-14 (LM 371 auktoritativ) och D-15 (regression) gäller fullt ut: gaten i `build/lm371/regression.py`. Bytet till rent marknadsvärde höjer exemplets IRR 6,30 → 8,03 % — medvetet, kompenseras via yield-kalibrering och avkastningskrav från intranätet.
+**Verifierat:** commits 9261d7d → 54856a7 (2026-09-30).
+
+---
+
 *Lägg till nya beslut längst ner med löpande nummer. Ändra ALDRIG befintliga — markera som "OMPRÖVAD i D-XX" om de ersätts.*

@@ -86,7 +86,8 @@ def ops_restvarde() -> list[dict]:
           _set(KD, "G13", f='=IF(COUNTA(M3,M6,M7,M9,Q15,Q17,C23:C27,E23:E27,F23:F27,G23:G27,I23:I27,J23:J27,'
                             'M23:M27,N23:N27,O23:O27,Q23:Q27,S23:S27,R23:R27)<17,"Fyll i alla tvingande fält",'
                             'IF(SUMPRODUCT(--($H$23:$H$27>0),--($E$23:$E$27<>"Bef"),--($T$23:$T$27=0))>0,'
-                            '"Investering saknas för objekt med area (sektion 4)",""))'),
+                            '"Investering saknas för objekt med area (sektion 4)",'
+                            'IF($AD$12<>1,"Hyresmultiplikator AD12 ≠ 1","")))'),
           {"op": "replace", "sheet": KD, "ref": "D13:D15", "find": 'G13="Fyll i alla tvingande fält"', "repl": 'G13<>""'},
           ]
     # ── Sektion 5: Restvärdesbedömning ──
