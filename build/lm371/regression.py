@@ -141,12 +141,44 @@ def check_bef(v3: Path) -> None:
     print(f"  Bef-rad + P9 50 Mkr → krav 1/2 oförändrade, krav 3 {_p(res, KD, 'D15'):,.0f} tkr (hela) ✓")
 
 
+def check_sensitivity(v3: Path) -> None:
+    """Bedömt-scenariot == rad 37/D40/E82 bit-för-bit; opt > bedömt > pess; flik 1 speglar flik 5."""
+    ops = [probe(IRR, "D40"), probe(IRR, "E55"), probe(IRR, "E56"), probe(IRR, "E57"),
+           probe(IRR, "F55"), probe(IRR, "F56"), probe(IRR, "F57"), probe(IRR, "D56"), probe(IRR, "C10"),
+           probe(NPV, "E82"), probe("1. Framskrivningsunderlag", "D68"), probe("1. Framskrivningsunderlag", "G107"),
+           scan(IRR, "B53:G57"), scan(IRR, "D59:BA61"), scan("1. Framskrivningsunderlag", "B64:G70")]
+    res = run(v3, ops)
+    fails = []
+    if _p(res, IRR, "E56") != _p(res, IRR, "D40"):
+        fails.append(f"bedömt IRR {_p(res, IRR, 'E56')} != D40 {_p(res, IRR, 'D40')}")
+    if not _close(_p(res, IRR, "F56"), _p(res, NPV, "E82"), 0.5):
+        fails.append(f"bedömt NPV {_p(res, IRR, 'F56')} != E82 {_p(res, NPV, 'E82')}")
+    if not _close(_p(res, IRR, "D56"), _p(res, IRR, "C10"), 0.5):
+        fails.append("bedömt exit != C10")
+    if not (_p(res, IRR, "E55") > _p(res, IRR, "E56") > _p(res, IRR, "E57")):
+        fails.append("IRR-ordning opt > bedömt > pess bruten")
+    if not (_p(res, IRR, "F55") > _p(res, IRR, "F56") > _p(res, IRR, "F57")):
+        fails.append("NPV-ordning opt > bedömt > pess bruten")
+    if _p(res, "1. Framskrivningsunderlag", "D68") != _p(res, IRR, "E56"):
+        fails.append("flik 1 bedömt-IRR speglar inte flik 5")
+    if not _close(_p(res, "1. Framskrivningsunderlag", "G107"), _p(res, NPV, "E82"), 0.5):
+        fails.append("flik 1 NPV-rad (flyttad 100→107) pekar fel efter radinfogning")
+    for k, n in res["errors"].items():
+        if n:
+            fails.append(f"felvärden i {k}: {n}")
+    if fails:
+        raise AssertionError("KÄNSLIGHET RÖD:" + chr(10) + "  - " + (chr(10) + "  - ").join(fails) + chr(10) + f"{res}")
+    print(f"  känslighet: IRR {_p(res, IRR, 'E55'):.2%} / {_p(res, IRR, 'E56'):.2%} / {_p(res, IRR, 'E57'):.2%}, "
+          f"NPV {_p(res, IRR, 'F55'):,.0f} / {_p(res, IRR, 'F56'):,.0f} / {_p(res, IRR, 'F57'):,.0f} ✓")
+
+
 def run_all(v3: Path, res: dict | None = None) -> None:
     check_v3(res if res is not None else run(v3, PROBES))
     check_legacy_weights(v3)
     check_adjustment(v3)
     check_empty_matrix(v3)
     check_bef(v3)
+    check_sensitivity(v3)
     print("REGRESSION GRÖN")
 
 
