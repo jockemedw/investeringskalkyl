@@ -80,7 +80,14 @@ def ops_restvarde() -> list[dict]:
           _set(KD, "M8", f="=$M$11+$M$9"),
           # Varningsrutan: visa yield-justering bredvid dagens restvärdesvarning
           _set(KD, "G14", f='=IF(\'5. IRR\'!C11<>"","Eget restvärde ifyllt i 5. IRR. ","")'
-                            '&IF(M10<>0,"Direktavkastning justerad "&ROUND(M10*100,2)&" pp (sektion 5)","")'),
+                            '&IF(M10<>0,"Yield "&IF(M10>0,"+","")&ROUND(M10*100,2)&" pp → "&ROUND(M11*100,2)&" %","")'),
+          # Tvingande-vakten: S23:S27 är nu formler (COUNTA räknar dem som ifyllda) → explicit
+          # kontroll att varje icke-Bef-objekt med area har en investering (matris eller U-överstyrning)
+          _set(KD, "G13", f='=IF(COUNTA(M3,M6,M7,M9,Q15,Q17,C23:C27,E23:E27,F23:F27,G23:G27,I23:I27,J23:J27,'
+                            'M23:M27,N23:N27,O23:O27,Q23:Q27,S23:S27,R23:R27)<17,"Fyll i alla tvingande fält",'
+                            'IF(SUMPRODUCT(--($H$23:$H$27>0),--($E$23:$E$27<>"Bef"),--($T$23:$T$27=0))>0,'
+                            '"Investering saknas för objekt med area (sektion 4)",""))'),
+          {"op": "replace", "sheet": KD, "ref": "D13:D15", "find": 'G13="Fyll i alla tvingande fält"', "repl": 'G13<>""'},
           ]
     # ── Sektion 5: Restvärdesbedömning ──
     o += [_fmt(KD, "C31", f"C{S5_HDR}"), _set(KD, f"C{S5_HDR}", v="RESTVÄRDESBEDÖMNING"),
@@ -183,7 +190,7 @@ def ops_matris() -> list[dict]:
 def main() -> int:
     # gamla fem rutorna rensas FÖRST — hjälpområdet AC4:AC9 återanvänds för dropdown-skalan
     ops = [{"op": "clear", "sheet": KD, "ref": "AC1:AP20"}] + ops_restvarde() + ops_matris()
-    from regression import PROBES, check_v3, check_legacy_weights, check_source_baseline, check_adjustment
+    from regression import PROBES, check_v3, check_legacy_weights, check_source_baseline, check_adjustment, check_empty_matrix
     print("Baslinje källa …", end=" ")
     check_source_baseline(SOURCE)
     print("ok")
@@ -193,6 +200,7 @@ def main() -> int:
     check_v3(res)
     check_legacy_weights(OUT)
     check_adjustment(OUT)
+    check_empty_matrix(OUT)
     print("REGRESSION GRÖN")
     return 0
 

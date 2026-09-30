@@ -89,12 +89,23 @@ def check_adjustment(v3: Path) -> None:
     print(f"  +0,50 pp → yield 7,0 %, exit {_p(res, IRR, 'C10'):,.0f}, IRR {_p(res, KD, 'D14'):.4%}, NPV {_p(res, KD, 'D13'):,.0f} tkr ✓")
 
 
+def check_empty_matrix(v3: Path) -> None:
+    """Tom matris + ingen överstyrning → vakten slår till och resultaten blankas."""
+    ops = [{"op": "set", "sheet": KD, "ref": "G58", "value": 0},
+           probe(KD, "G13"), probe(KD, "D13"), probe(KD, "D15"), probe(KD, "S23")]
+    res = run(v3, ops)
+    assert _p(res, KD, "G13") == "Investering saknas för objekt med area (sektion 4)", res
+    assert _p(res, KD, "D13") in ("", None) and _p(res, KD, "D15") in ("", None), res
+    print("  tom matris → vakt + blanka resultat ✓")
+
+
 def main(path: Path | None = None) -> int:
     v3 = path or HERE / "LM371_v3.xlsx"
     res = run(v3, PROBES)
     check_v3(res)
     check_legacy_weights(v3)
     check_adjustment(v3)
+    check_empty_matrix(v3)
     print("REGRESSION GRÖN")
     return 0
 

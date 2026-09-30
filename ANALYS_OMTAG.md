@@ -103,10 +103,10 @@ huvudkostnaden för varje punkt ovan och skälet till att insatserna är "liten"
 
 Pipeline: `build/lm371/patch.ps1` (Excel COM) styrd av `build/lm371/build.py`; källa = `LM 371 Investeringskalkyl.xlsx` (orörd, läggs in i repot), utdata `build/lm371/LM371_v3.xlsx`. Regression `build/lm371/regression.py`: (a) med vikter 0/0,4/0,6 + Neutralt + gamla flödesdefinitionen ⇒ `D13 = 10 300`, `D14 = 6,298 %`, `D15 = 10 300`; (b) nollfelsscan på synliga celler; (c) exempel utan Bef-rad ⇒ krav 1/2 oförändrade av Bef-omläggningen.
 
-1. Baslinje: kopiera mallen in i repot, pinna D13/D14/D15, COM-skelett + regression grön på oförändrad fil.
-2. Flik 2: rad under `M6` "Justering direktavkastning" + "Justerad direktavkastning"; `M8` → justerad. Ny sektion 4 "Restvärdesbedömning" rad 44+: 4 dropdowns (list-DV via COM), effekt, motivering, summa. Ny inmatning "Återstående avskrivningstid befintligt" vid `P9`.
-3. Ompekning yield: `7.Grafer!C44:AZ44`, `4. NPV!C50/E50`, `1. Framskr.!G68/K68` (+ ny rad för justering). Vikter 0/1/0 med not. `G14`-varningen utökas med yield-justering.
-4. Bef-omläggning flik 4: Bef-del av intäkter/DoU/restvärde särskiljs (SUMIFS på typ, `D$7`-schablonrader). Rad "Driftnetto tillkommande" och "Driftnetto hela fastigheten". Krav 1 (`E59`) och flik 5 rad 23 på tillkommande; krav 3 (`D15`) på hela. Flik 3: separat avskrivning `P9` på egen tid.
+1. ✅ (9261d7d) Baslinje: kopiera mallen in i repot, pinna D13/D14/D15, COM-skelett + regression grön på oförändrad fil.
+2. ✅ (9261d7d) Flik 2: rad under `M6` "Justering direktavkastning" + "Justerad direktavkastning"; `M8` → justerad. Ny sektion 4 "Restvärdesbedömning" rad 44+: 4 dropdowns (list-DV via COM), effekt, motivering, summa.
+3. ✅ (9261d7d) Ompekning yield: `7.Grafer!C44:AZ44`, `4. NPV!C50/E50`, `1. Framskr.!G68/K68` (+ ny rad för justering). Vikter 0/1/0 med not. `G14`-varningen utökas med yield-justering.
+4. Bef-omläggning flik 4: Bef-del av intäkter/DoU/restvärde särskiljs (SUMIFS på typ, `D$7`-schablonrader). Rad "Driftnetto tillkommande" och "Driftnetto hela fastigheten". Krav 1 (`E59`) och flik 5 rad 23 på tillkommande; krav 3 (`D15`) på hela. Ny inmatning "Återstående avskrivningstid befintligt" vid `P9`; flik 3 skriver av `P9` på egen tid.
 5. Känslighet flik 5: tre rader = rad 37 + Δexit i exit-årskolumnen (yield −1/±0/+1 pp), IRR per rad. Flik 1 "Kontroll restvärde" (L108–L112) visar extern yield, justering, justerad yield, tre scenarier; krav 3-flagga.
 6. Kravhyra: multiplikator m på icke-Bef-raders `L23:L27`; envariabels datatabell m=0/m=1 → kassaflöden; analytisk kravhyra per krav (1, 2, 3-tillkommande), MAX. Oavrundade mellanled (`C48/C50`, `5. IRR!C6:C10` avrundas i visning). Resultat på flik 2 nyckeltalsrutan + flik 1.
 7. Uppdateringshistorik flik 1 kol R, lathund-notering, regression grön, COM-omräkning av exempel + skärmkoll av flik 1/2/5.
