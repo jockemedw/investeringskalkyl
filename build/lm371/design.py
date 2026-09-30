@@ -61,7 +61,8 @@ def ops_design() -> list[dict]:
     # Diagnostikceller i rad 2 (LEN/ISBLANK) — ingen refererar dem
     o += [{"op": "clear", "sheet": KD, "ref": "F2"}, {"op": "clear", "sheet": KD, "ref": "V2"}]
     # Hjälpområden: dropdown-skala, datatabell, årsvisa hjälptabeller → dolda kolumner
-    o += [{"op": "hide_cols", "sheet": KD, "ref": "AC:CB"}]
+    o += [{"op": "clear_outline", "sheet": KD, "ref": "AC:AP"},   # mallens +-knapp skulle annars visa hjälpområdet
+          {"op": "hide_cols", "sheet": KD, "ref": "AC:CB"}]
     # ── Årskolumner: ##### bort ───────────────────────────────────────────────
     o += [{"op": "nofill", "sheet": KD, "ref": "I18:M18"},                  # notisen syns bara vid Bef — ingen tom remsa
           {"op": "colwidth", "sheet": KD, "ref": "D:D", "w": 11.0},          # "10 300 tkr" i D13:E13 vid utskrift

@@ -22,8 +22,9 @@ tags: [python, openpyxl, excel, fastigheter]
 - [x] FINAL m3 — design-excellens-pass, 2 hela PDF-granskningsvarv
 - [x] POLISH m1–m5 — ifyllnadsupplevelsen: input-språk, validering, bladskydd, öppningsvyer, tom mall, 2 skärm-granskningsvarv (D-23–D-25)
 - [x] Omtag fas 1: LM371_v3 (2026-09-30)
+- [x] Omtag fas 2: formelfixar F1–F6 (2026-09-30)
+- [x] Omtag design-runda: färgregel, städning, utskrift 16 sidor (2026-09-30)
 - [ ] Joakim: granska LM371_v3.xlsx
-- [ ] Omtag fas 2: formelfixar
 
 ## Anteckningar
 Bygg: `python build/oneshot/build_v2.py` (replay + rundor + recalc + regressionsgate). Print/design verifieras ENDAST med trogen export (`build/oneshot/export_pdf.py`) — render_local//xlsx-review och PageSetup.Pages.Count är opålitliga. Testfall: Skola (Nyb) 5 000 kvm × 40 000 kr/kvm = 200 Mkr.

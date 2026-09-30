@@ -6,8 +6,9 @@ Beställare: Lejonfastigheter AB (kommunalt fastighetsbolag, Linköping).
 **OMTAG 2026-09-30 — aktuell produkt är `build/lm371/LM371_v3.xlsx`:** LM 371-mallen kirurgiskt
 patchad via Excel COM (openpyxl förstör x14-valideringar och diagram). Fas 1 klar: restvärde =
 rent MV vid justerad yield, Bef = nollalternativ, investeringsmatris, känslighet, kravhyra som output.
-Bygg `python build/lm371/build.py` (ops i build.py + step4_bef/step5_kanslighet/step6_kravhyra,
-generisk applier `apply.ps1`, gate `regression.py`). Analys + beslut 1–10: [ANALYS_OMTAG.md](ANALYS_OMTAG.md).
+Bygg `python build/lm371/build.py` (ops i build.py + step4_bef/step5_kanslighet/step6_kravhyra/
+fas2_fixar/design, generisk applier `apply.ps1`, gate `regression.py`). Design-runda 2026-09-30: färgregel,
+dolda hjälpområden, utskrift 16 sidor (`build/lm371/print_preview.pdf`). Analys + beslut 1–10: [ANALYS_OMTAG.md](ANALYS_OMTAG.md).
 Lathundstillägg/ändringslogg: [build/lm371/LM371_v3.md](build/lm371/LM371_v3.md). COM-läxor: NumberFormat
 är lokal-känslig här (kopiera format från befintliga celler eller NumberFormatLocal), radinfogning
 flyttar källadresser för senare fmt_from, mallens flik 5 har dold outline-grupp rad 42–49.
@@ -27,6 +28,13 @@ Testfall: Skola (Nyb) 5 000 kvm × 40 000 kr/kvm = 200 Mkr.
 ## Arbetsflöde
 
 ```bash
+# LM371 v3 (aktuell produkt): bygg från orörd mall via Excel COM + regressionsgate
+python build/lm371/build.py
+# Skärmgranskning (obligatorisk efter designändring) och trogen PDF för v3:
+python build/oneshot/screenshot_sheets.py build/lm371/LM371_v3.xlsx --out <dir> [--sheets "2. Kalkyldata,5. IRR"]
+python build/oneshot/export_pdf.py <kopia av LM371_v3.xlsx>   # räkna sidor i .print/*.pdf
+
+# --- v2-spåret (parkerat) ---
 # Bygga v2 (spec-replay + rundor + recalc + regression i ett):
 python build/oneshot/build_v2.py
 
@@ -109,6 +117,7 @@ Status (senaste rad = överst):
 - [x] Faktisk IRR EK per scenario i känslighetstabellen — klar i FINAL m2 (se ovan, D-21)
 
 - [x] **OMTAG fas 1 (2026-09-30):** LM371_v3 steg 1–7 committade (9261d7d → 50c8cf2 + steg 7). Se ANALYS_OMTAG.md.
+- [x] **OMTAG design-runda (2026-09-30, 373efae):** `design.py` — färgregel input 0,4/beräknat 0,8, hjälpområden dolda, enhetlig utskrift 3 308 → 16 sidor, alla flikar skärm- + PDF-granskade.
 - [x] **OMTAG fas 2 (2026-09-30):** F1–F6 formelfixar (hyresindex, CA-index, negativ exponent, LOOKUP, MROUND, 16 438 #REF!). Baslinje-IRR flyttad 8,026 → 8,032 % (legacy 6,298 → 6,306 %) av CA-fixen, pinnad i regression.py. Läxa: Range.Replace arbetar mot FormulaLocal — inga ',' eller funktionsnamn i replace-ops (comrun vägrar).
 - [ ] **OMTAG fas 4 (separat beslut):** helobjektshantering (befintligt driftnetto + bokfört värde).
 

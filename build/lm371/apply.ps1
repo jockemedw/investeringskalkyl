@@ -44,6 +44,7 @@ try {
             "hpagebreak" { $ws.HPageBreaks.Add($ws.Range($ref)) | Out-Null }
             "nofill"     { $ws.Range($ref).Interior.Pattern = -4142 }
             "fontcolor"  { $ws.Range($ref).Font.ThemeColor = [int]$o.theme }
+            "clear_outline" { $ws.Range($ref).EntireColumn.ClearOutline() | Out-Null }
             "hide_cols"  { $ws.Range($ref).EntireColumn.Hidden = $true }
             "colwidth"   { $ws.Range($ref).EntireColumn.ColumnWidth = [double]$o.w }
             "freeze"     { $ws.Activate() | Out-Null; $xl.ActiveWindow.FreezePanes = $false; $ws.Range($ref).Select() | Out-Null; $xl.ActiveWindow.FreezePanes = $true }
