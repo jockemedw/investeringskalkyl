@@ -123,7 +123,7 @@ def check_bef(v3: Path) -> None:
            kd("M24", 2026), kd("N24", 2035), kd("O24", 1400), kd("P24", 0.05),
            kd("G34", 120),            # Bef-schablon fastighetsskötsel
            kd("P9", 50_000_000),      # befintligt bokfört värde
-           kd("Q18", 15),             # egen återstående avskrivningstid
+           kd("Q13", 15),             # egen återstående avskrivningstid
            probe(KD, "D13"), probe(KD, "D14"), probe(KD, "D15"), probe(KD, "G13"),
            probe(NPV, "E82"), probe(NPV, "E59"), probe(NPV, "E70"), probe(IRR, "C10"), probe(FIN, "D40"),
            scan(NPV, "B64:BA82"), scan(IRR, "B5:C41")]

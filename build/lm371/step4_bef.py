@@ -57,11 +57,11 @@ def _year_formula(template: str, X: str) -> str:
 def ops_bef() -> list[dict]:
     o: list[dict] = []
     # ── Flik 2: återstående avskrivningstid för befintligt bokfört värde (beslut 10) ──
-    o += [_fmt(KD, "N17", "N18"), _set(KD, "N18", v="Avskr.tid befintligt"),
-          _fmt(KD, "P17", "P18"), _set(KD, "P18", f="=IF(Q18<>0,Q18,P16)"),
-          _fmt(KD, "Q17", "Q18"),
+    o += [_fmt(KD, "N17", "N13"), _set(KD, "N13", v="Avskr.tid befintligt"),
+          _fmt(KD, "P17", "P13"), _set(KD, "P13", f="=IF(Q13<>0,Q13,P16)"),
+          _fmt(KD, "Q17", "Q13"),
           {"op": "replace", "sheet": FIN, "ref": "D40:BA40",
-           "find": "'2. Kalkyldata'!$P$16", "repl": "'2. Kalkyldata'!$P$18"},
+           "find": "'2. Kalkyldata'!$P$16", "repl": "'2. Kalkyldata'!$P$13"},
           _fmt(KD, "C42", "I18:M18"), {"op": "merge", "sheet": KD, "ref": "I18:M18"},
           {"op": "wrap", "sheet": KD, "ref": "I18"}, {"op": "rowheight", "sheet": KD, "row": 18, "h": 30},
           _set(KD, "I18", f='=IF(COUNTIF(E23:E27,"Bef")+(P9>0)>0,'

@@ -205,13 +205,14 @@ def main() -> int:
     from step5_kanslighet import ops_kanslighet
     from step6_kravhyra import ops_kravhyra
     from fas2_fixar import ops_fas2
+    from design import ops_design
     from regression import PROBES, check_source_baseline, run_all
     # gamla fem rutorna rensas FÖRST — hjälpområdet AC4:AC9 återanvänds för dropdown-skalan.
     # goto sist: flik 2 öppnas på rad 1, boken öppnas på flik 1.
     ops = ([{"op": "clear", "sheet": KD, "ref": "AC1:AP20"}]
            + ops_restvarde() + ops_matris() + ops_bef() + ops_kanslighet() + ops_kravhyra() + ops_fas2()
-           + ops_historik()
-           + [{"op": "goto", "sheet": IRR, "ref": "A1"}, {"op": "goto", "sheet": NPV, "ref": "A1"},
+           + ops_historik() + ops_design()
+           + [{"op": "goto", "sheet": GRAF, "ref": "A38"}, {"op": "goto", "sheet": IRR, "ref": "A1"}, {"op": "goto", "sheet": NPV, "ref": "A1"},
               {"op": "goto", "sheet": KD, "ref": "A1"}, {"op": "goto", "sheet": FS, "ref": "A1"}])
     print("Baslinje källa …", end=" ")
     check_source_baseline(SOURCE)
