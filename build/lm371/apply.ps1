@@ -35,6 +35,7 @@ try {
             "wrap"       { $ws.Range($ref).WrapText = $true }
             "bold"       { $ws.Range($ref).Font.Bold = $true }
             "italic"     { $ws.Range($ref).Font.Italic = $true }
+            "colwidth_from" { $ws.Columns([string]$o.dst).ColumnWidth = $ws.Columns([string]$o.src).ColumnWidth }
             "rowheight"  { $ws.Rows($o.row).RowHeight = [double]$o.h }
             "goto"       { $ws.Activate() | Out-Null; $xl.Goto($ws.Range($ref), $true) | Out-Null }
             "probe"      { }

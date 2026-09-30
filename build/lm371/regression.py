@@ -2,8 +2,11 @@
 
 (a) Källan reproducerar dagens siffror: D13 = 10 300, D14 = 6,298 %, D15 = 10 300.
 (b) v3 med Neutralt: D13/D15 oförändrade, D14 = 8,026 % (rent MV), M10 = 0, M11 = M6,
-    S23 = 240 Mkr / 6 100 kvm via matrisen, noll felvärden i flik 2:s synliga område.
+    S23 = 240 Mkr / 6 100 kvm via matrisen, noll felvärden i synliga områden.
 (c) v3 med vikter 0/0,4/0,6 återger dagens IRR exakt.
+(d) Icke-neutral bedömning flyttar yield, exit, IRR och NPV åt rätt håll.
+(e) Tom investeringsmatris → tvingande-vakt + blanka resultat.
+(f) Bef-rad + befintligt bokfört värde påverkar bara krav 3 (hela fastigheten).
 
 Kör:  python build/lm371/regression.py   (mot build/lm371/LM371_v3.xlsx)
 """
@@ -17,6 +20,8 @@ from comrun import run, probe, scan  # noqa: E402
 
 KD = "2. Kalkyldata"
 IRR = "5. IRR"
+NPV = "4. NPV"
+FIN = "3. Finansiering"
 
 BASE_NPV, BASE_IRR, BASE_PV = 10300.0, 0.0629828143787814, 10300.0
 V3_IRR = 0.0802573957499011          # rent marknadsvärde, exemplets hyra (COM-verifierat 2026-09-30)
@@ -26,7 +31,8 @@ PROBES = [probe(KD, "D13"), probe(KD, "D14"), probe(KD, "D15"),
           probe(KD, "M6"), probe(KD, "M8"), probe(KD, "M10"), probe(KD, "M11"),
           probe(KD, "S23"), probe(KD, "H23"), probe(KD, "G69"), probe(KD, "L69"),
           probe(IRR, "C10"), probe(IRR, "A7"), probe(IRR, "A8"),
-          scan(KD, "C3:U81"), scan(IRR, "B5:C41")]
+          probe(NPV, "E59"), probe(NPV, "E82"),
+          scan(KD, "C3:U81"), scan(IRR, "B5:C41"), scan(NPV, "B64:BA82")]
 
 
 def _p(res, sheet, ref):
@@ -34,7 +40,7 @@ def _p(res, sheet, ref):
 
 
 def _close(a, b, tol):
-    return a is not None and abs(a - b) <= tol
+    return isinstance(a, (int, float)) and abs(a - b) <= tol
 
 
 def check_source_baseline(source: Path) -> None:
@@ -46,6 +52,7 @@ def check_source_baseline(source: Path) -> None:
 
 def check_v3(res: dict) -> None:
     fails = []
+
     def want(label, ok):
         if not ok:
             fails.append(label)
@@ -59,6 +66,7 @@ def check_v3(res: dict) -> None:
     want("Matris G69 = 240 Mkr", _close(_p(res, KD, "G69"), 240_000_000, 0.5))
     want("Exit C10 = 268,5 Mkr (rent MV)", _close(_p(res, IRR, "C10"), 268_500_000, 0.5))
     want("Vikter 0/1/0", _p(res, IRR, "A7") == 1 and _p(res, IRR, "A8") == 0)
+    want("NPV tillkommande = NPV hela utan Bef-rader", _close(_p(res, NPV, "E82"), _p(res, NPV, "E59"), 0.5))
     for k, n in res["errors"].items():
         want(f"noll felvärden i {k} (hittade {n})", n == 0)
     for k, v in res["probes"].items():
@@ -99,14 +107,51 @@ def check_empty_matrix(v3: Path) -> None:
     print("  tom matris → vakt + blanka resultat ✓")
 
 
-def main(path: Path | None = None) -> int:
-    v3 = path or HERE / "LM371_v3.xlsx"
-    res = run(v3, PROBES)
-    check_v3(res)
+def check_bef(v3: Path) -> None:
+    """Bef-rad + befintligt bokfört värde + Bef-DoU: krav 1 och 2 oförändrade, krav 3 (hela) ändras."""
+    def kd(ref, v):
+        return {"op": "set", "sheet": KD, "ref": ref, "value": v}
+    ops = [kd("C24", "Befhuset"), kd("E24", "Bef"), kd("F24", 2000), kd("I24", 1500), kd("J24", 0.7),
+           kd("M24", 2026), kd("N24", 2035), kd("O24", 1400), kd("P24", 0.05),
+           kd("G34", 120),            # Bef-schablon fastighetsskötsel
+           kd("P9", 50_000_000),      # befintligt bokfört värde
+           kd("Q18", 15),             # egen återstående avskrivningstid
+           probe(KD, "D13"), probe(KD, "D14"), probe(KD, "D15"), probe(KD, "G13"),
+           probe(NPV, "E82"), probe(NPV, "E59"), probe(NPV, "E70"), probe(IRR, "C10"), probe(FIN, "D40"),
+           scan(NPV, "B64:BA82"), scan(IRR, "B5:C41")]
+    res = run(v3, ops)
+    fails = []
+    if not _close(_p(res, KD, "D13"), BASE_NPV, 1):
+        fails.append(f"krav 1 påverkas av Bef: {_p(res, KD, 'D13')}")
+    if not _close(_p(res, KD, "D14"), V3_IRR, TOL_IRR):
+        fails.append(f"krav 2 påverkas av Bef: {_p(res, KD, 'D14')}")
+    if _close(_p(res, KD, "D15"), BASE_PV, 1):
+        fails.append("krav 3 (hela) reagerar inte på Bef/P9")
+    if not _p(res, NPV, "E70"):
+        fails.append("Bef-driftnetto = 0 trots Bef-rad")
+    if not _close(_p(res, FIN, "D40"), -50_000_000 / 15, 1):
+        fails.append(f"avskrivning bef fel: {_p(res, FIN, 'D40')}")
+    if _p(res, KD, "G13") != "":
+        fails.append(f"vakt: {_p(res, KD, 'G13')}")
+    for k, n in res["errors"].items():
+        if n:
+            fails.append(f"felvärden i {k}: {n}")
+    if fails:
+        raise AssertionError("BEF-TEST RÖD:\n  - " + "\n  - ".join(fails) + f"\n{res}")
+    print(f"  Bef-rad + P9 50 Mkr → krav 1/2 oförändrade, krav 3 {_p(res, KD, 'D15'):,.0f} tkr (hela) ✓")
+
+
+def run_all(v3: Path, res: dict | None = None) -> None:
+    check_v3(res if res is not None else run(v3, PROBES))
     check_legacy_weights(v3)
     check_adjustment(v3)
     check_empty_matrix(v3)
+    check_bef(v3)
     print("REGRESSION GRÖN")
+
+
+def main(path: Path | None = None) -> int:
+    run_all(path or HERE / "LM371_v3.xlsx")
     return 0
 
 

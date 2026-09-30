@@ -182,26 +182,25 @@ def ops_matris() -> list[dict]:
           # Exemplet: 240 Mkr låg hårdkodat i S23 — läggs på entreprenadraden för objekt 1
           _set(KD, f"G{S4_FIRST + 3}", v=240_000_000),
           {"op": "print_area", "sheet": KD, "area": f"$C$3:$U${PRINT_LAST}"},
-          {"op": "goto", "sheet": KD, "ref": "A1"}, {"op": "goto", "sheet": FS, "ref": "A1"},
           ]
     return o
 
 
 def main() -> int:
-    # gamla fem rutorna rensas FÖRST — hjälpområdet AC4:AC9 återanvänds för dropdown-skalan
-    ops = [{"op": "clear", "sheet": KD, "ref": "AC1:AP20"}] + ops_restvarde() + ops_matris()
-    from regression import PROBES, check_v3, check_legacy_weights, check_source_baseline, check_adjustment, check_empty_matrix
+    from step4_bef import ops_bef
+    from regression import PROBES, check_source_baseline, run_all
+    # gamla fem rutorna rensas FÖRST — hjälpområdet AC4:AC9 återanvänds för dropdown-skalan.
+    # goto sist: flik 2 öppnas på rad 1, boken öppnas på flik 1.
+    ops = ([{"op": "clear", "sheet": KD, "ref": "AC1:AP20"}]
+           + ops_restvarde() + ops_matris() + ops_bef()
+           + [{"op": "goto", "sheet": KD, "ref": "A1"}, {"op": "goto", "sheet": FS, "ref": "A1"}])
     print("Baslinje källa …", end=" ")
     check_source_baseline(SOURCE)
     print("ok")
     print(f"Bygger {OUT.name} ({len(ops)} ops) …", end=" ")
     res = run(SOURCE, ops + PROBES, OUT)
     print("ok")
-    check_v3(res)
-    check_legacy_weights(OUT)
-    check_adjustment(OUT)
-    check_empty_matrix(OUT)
-    print("REGRESSION GRÖN")
+    run_all(OUT, res)
     return 0
 
 
