@@ -182,15 +182,15 @@ def check_sensitivity(v3: Path) -> None:
 
 def check_kravhyra(v3: Path) -> None:
     """Kravhyran är exakt: insatt som hyra klarar båda kraven med liten marginal, och det bindande kravet ligger på gränsen."""
-    res = run(v3, [probe(KD, "D17"), probe(KD, "V23"), probe(KD, "AE19"), probe(KD, "AD19"), probe(KD, "AD20"),
+    res = run(v3, [probe(KD, "D17"), probe(KD, "I17"), probe(KD, "AE19"), probe(KD, "AD19"), probe(KD, "AD20"),
                    probe(KD, "AD15"), probe(KD, "AD16"), probe(KD, "AE15"), probe(KD, "AE16"),
                    probe(IRR, "H55"), probe(IRR, "H56"), probe(IRR, "H57"), probe("1. Framskrivningsunderlag", "G107")])
-    krav = _p(res, KD, "V23")
+    krav = _p(res, KD, "D17")
     fails = []
     if not (isinstance(krav, (int, float)) and 0 < krav < 2650):
         fails.append(f"kravhyra orimlig: {krav} (exemplet klarar kraven vid 2 650)")
-    if _p(res, KD, "D17") != krav:
-        fails.append("D17 (viktad) != V23 vid ett objekt")
+    if _p(res, KD, "I17") not in ("", None):
+        fails.append(f"I17-notis ska vara tom när hyran räcker: {_p(res, KD, 'I17')!r}")
     if not (_p(res, IRR, "H55") < _p(res, IRR, "H56") < _p(res, IRR, "H57")):
         fails.append("kravhyra per scenario ej stigande opt < bedömt < pess")
     if _p(res, "1. Framskrivningsunderlag", "G107") != _p(res, KD, "D17"):

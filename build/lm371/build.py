@@ -115,7 +115,7 @@ def ops_restvarde() -> list[dict]:
     for i, (label, hint) in enumerate(params):
         r = S5_FIRST + i
         o += [_fmt(KD, "C34:F34", f"C{r}:F{r}"), _set(KD, f"C{r}", v=label),
-              _fmt(KD, "M6", f"G{r}"), _set(KD, f"G{r}", v="Neutralt"), {"op": "align", "sheet": KD, "ref": f"G{r}", "h": CENTER},
+              _fmt(KD, "I23", f"G{r}"), _set(KD, f"G{r}", v="Neutralt"), {"op": "align", "sheet": KD, "ref": f"G{r}", "h": CENTER},
               {"op": "dv_list", "sheet": KD, "ref": f"G{r}", "source": "=$AC$5:$AC$9"},
               _fmt(KD, "M8", f"H{r}"),
               _set(KD, f"H{r}", f=f"=IFERROR((MATCH(G{r},$AC$5:$AC$9,0)-3)*{STEG},0)"),

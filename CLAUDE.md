@@ -117,7 +117,7 @@ Status (senaste rad = överst):
 - [x] Faktisk IRR EK per scenario i känslighetstabellen — klar i FINAL m2 (se ovan, D-21)
 
 - [x] **OMTAG fas 1 (2026-09-30):** LM371_v3 steg 1–7 committade (9261d7d → 50c8cf2 + steg 7). Se ANALYS_OMTAG.md.
-- [x] **OMTAG design-runda (2026-09-30, 373efae):** `design.py` — färgregel input 0,4/beräknat 0,8, hjälpområden dolda, enhetlig utskrift 3 308 → 16 sidor, alla flikar skärm- + PDF-granskade.
+- [x] **OMTAG design-runda (2026-09-30, 373efae):** `design.py` — mallens tretons-färger behålls (egen färgregel drogs tillbaka 2026-10-01 efter jämförelse mot originalet), hjälpområden dolda, enhetlig utskrift 3 308 → 16 sidor, alla flikar skärm- + PDF-granskade.
 - [x] **OMTAG fas 2 (2026-09-30):** F1–F6 formelfixar (hyresindex, CA-index, negativ exponent, LOOKUP, MROUND, 16 438 #REF!). Baslinje-IRR flyttad 8,026 → 8,032 % (legacy 6,298 → 6,306 %) av CA-fixen, pinnad i regression.py. Läxa: Range.Replace arbetar mot FormulaLocal — inga ',' eller funktionsnamn i replace-ops (comrun vägrar).
 - [ ] **OMTAG fas 4 (separat beslut):** helobjektshantering (befintligt driftnetto + bokfört värde).
 

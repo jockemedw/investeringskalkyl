@@ -71,8 +71,8 @@ def ops_kanslighet() -> list[dict]:
           _set(FS, f"B{F_COLS}", v="Scenario"), _set(FS, f"C{F_COLS}", v="Direktavk."),
           _set(FS, f"D{F_COLS}", v="IRR före skatt"), _set(FS, f"E{F_COLS}", v="Exit-värde"),
           _set(FS, f"F{F_COLS}", f=f'="Krav "&ROUND({K}$F$14*100,2)&" %"'), _set(FS, f"G{F_COLS}", v="NPV tillkommande"),
-          _fmt(FS, "B108:H108", f"B{F_OPT}:H{F_PES}"),                           # = gamla rad 101 (PV-raden, vit)
-          _fmt(FS, "G108", f"E{F_OPT}:E{F_PES}"), _fmt(FS, "G108", f"G{F_OPT}:G{F_PES}"),
+          _fmt(FS, "B88:H88", f"B{F_OPT}:H{F_PES}"),                             # normal 11 pt (= gamla rad 81)
+          _fmt(FS, "G107", f"E{F_OPT}:E{F_PES}"), _fmt(FS, "G107", f"G{F_OPT}:G{F_PES}"),   # #,##0 kr (= gamla rad 100)
           _pct(FS, f"C{F_OPT}:D{F_PES}"),
           {"op": "align", "sheet": FS, "ref": f"C{F_COLS}:G{F_PES}", "h": -4152},
           ]

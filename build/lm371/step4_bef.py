@@ -62,12 +62,10 @@ def ops_bef() -> list[dict]:
           _fmt(KD, "Q17", "Q13"),
           {"op": "replace", "sheet": FIN, "ref": "D40:BA40",
            "find": "'2. Kalkyldata'!$P$16", "repl": "'2. Kalkyldata'!$P$13"},
-          _fmt(KD, "C42", "I18:M18"), {"op": "merge", "sheet": KD, "ref": "I18:M18"},
-          {"op": "wrap", "sheet": KD, "ref": "I18"}, {"op": "rowheight", "sheet": KD, "row": 18, "h": 30},
-          _set(KD, "I18", f='=IF(COUNTIF(E23:E27,"Bef")+(P9>0)>0,'
-                            '"Bef-objekt och befintligt bokfört värde ingår bara i krav 3 (hela fastigheten). '
-                            'Krav 1–2 räknar tillkommande.","")'),
-          {"op": "italic", "sheet": KD, "ref": "I18"},
+          _set(KD, "I17", f='=IF(OR(AND(M23<>0,M23<R23),AND(M24<>0,M24<R24),AND(M25<>0,M25<R25),AND(M26<>0,M26<R26),'
+                            'AND(M27<>0,M27<R27)),"Glapp, Avtalstid / Prod.avslut. ","")'
+                            '&IF(G13<>"","",IF(D17>$AD$20,"Höj hyran "&ROUND(D17-$AD$20,0)&" kr/kvm för krav 1–2. ",""))'
+                            '&IF(COUNTIF(E23:E27,"Bef")+(P9>0)>0,"Bef/bokfört värde ingår bara i krav 3.","")'),
           ]
     # ── Flik 4: block tillkommande vs hela ──
     o += [_fmt(NPV, "B47:E47", f"B{B_HDR}:E{B_HDR}"),

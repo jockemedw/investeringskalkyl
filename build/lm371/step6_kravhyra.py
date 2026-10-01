@@ -58,14 +58,7 @@ def ops_kravhyra() -> list[dict]:
           _fmt(KD, "D16:E16", "D17:E17"), {"op": "merge", "sheet": KD, "ref": "D17:E17"},
           _set(KD, "D17", f='=IF(G13<>"","",CEILING($AD$19*$AD$20,1))'), _nl(KD, "D17", '# ##0'),
           _fmt(KD, "F16", "F17"), _set(KD, "F17", f='=IF(G13<>"","",LEFT($AE$19,3))'),
-          _fmt(KD, "G14", "G17:H17"), {"op": "merge", "sheet": KD, "ref": "G17:H17"},
-          _set(KD, "G17", f='=IF(G13<>"","",IF(D17<=$AD$20,"Angiven hyra räcker","Höj hyran "&ROUND(D17-$AD$20,0)&" kr/kvm"))'),
           ]
-    # ── Kolumn V i hyrestabellen: kravhyra per objekt ──
-    o += [_fmt(KD, "U22", "V22"), _set(KD, "V22", v="Kravhyra kr/kvm"), {"op": "wrap", "sheet": KD, "ref": "V22"},
-          _fmt(KD, "T23:T27", "V23:V27")]
-    for r in range(23, 28):
-        o.append(_set(KD, f"V{r}", f=f'=IF(OR($E{r}="Bef",$H{r}=0,$I{r}=""),"",CEILING($I{r}*$AD$19,1))'))
     # ── Flik 5: kravhyra per yield-scenario ──
     o += [_fmt(IRR, f"G{S_COLS}", f"H{S_COLS}"), _set(IRR, f"H{S_COLS}", v="Kravhyra kr/kvm"),
           _fmt(IRR, f"G{S_OPT}:G{S_PES}", f"H{S_OPT}:H{S_PES}"),
