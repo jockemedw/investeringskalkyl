@@ -62,8 +62,11 @@ def ops_design() -> list[dict]:
     # Diagnostikceller i rad 2 (LEN/ISBLANK) — ingen refererar dem
     o += [{"op": "clear", "sheet": KD, "ref": "F2"}, {"op": "clear", "sheet": KD, "ref": "V2"}]
     # Hjälpområden: dropdown-skala, datatabell, årsvisa hjälptabeller → dolda kolumner
+    # W:AA (Investering kr / Bokfört värde / Underhåll) är rena beräkningar som matar NPV, IRR och
+    # Finansiering — döljs (Joakim 2026-10-01: bredden bryter symmetrin). Totalinvesteringen syns i S28.
     o += [{"op": "clear_outline", "sheet": KD, "ref": "AC:AP"},   # mallens +-knapp skulle annars visa hjälpområdet
-          {"op": "hide_cols", "sheet": KD, "ref": "AC:CB"}]
+          {"op": "hide_cols", "sheet": KD, "ref": "W:CB"},
+          {"op": "clear", "sheet": KD, "ref": "V75:V78"}]        # hjälptexterna ligger nu som inmatningstips på dropdownen
     # ── Årskolumner: ##### bort ───────────────────────────────────────────────
     o += [{"op": "colwidth", "sheet": KD, "ref": "D:D", "w": 11.0},          # "10 300 tkr" i D13:E13 vid utskrift
           {"op": "colwidth", "sheet": KD, "ref": "P:P", "w": 14.0},          # "80 kr/kvm" klipptes i utskrift

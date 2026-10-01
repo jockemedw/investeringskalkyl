@@ -30,7 +30,8 @@ try {
             "clear_contents" { $ws.Range($ref).ClearContents() | Out-Null }
             "clear_fmt"  { $ws.Range($ref).ClearFormats() | Out-Null }
             "replace"    { $ws.Range($ref).Replace([string]$o.find, [string]$o.repl, 2) | Out-Null }
-            "dv_list"    { $r = $ws.Range($ref); $r.Validation.Delete(); $r.Validation.Add(3, 1, 1, [string]$o.source) | Out-Null; $r.Validation.InCellDropdown = $true }
+            "dv_list"    { $r = $ws.Range($ref); $r.Validation.Delete(); $r.Validation.Add(3, 1, 1, [string]$o.source) | Out-Null; $r.Validation.InCellDropdown = $true
+                           if ($null -ne $o.prompt) { $r.Validation.InputTitle = [string]$o.prompt_title; $r.Validation.InputMessage = [string]$o.prompt } }
             "print_area" { $ws.PageSetup.PrintArea = [string]$o.area }
             "align"      { $ws.Range($ref).HorizontalAlignment = [int]$o.h }
             "wrap"       { $ws.Range($ref).WrapText = $true }
