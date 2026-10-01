@@ -46,6 +46,19 @@ def ops_design() -> list[dict]:
     o: list[dict] = []
     # Färger: mallens egen tretons-hierarki behålls orörd (mörk+vit = nyckelantagande,
     # ljus = tabellinmatning, mellan = beräknat). Nya celler ärver via fmt_from i stegfilerna.
+    # ── Flik 2, Joakims justering 2026-10-01 (bild): tabellinmatning mellanblå, beräknat i
+    #    hyrestabellen mörkblå (svart text), DoU-total ljusblå, kostnadshöjning mellanblå svart text.
+    MID, DARK, LIGHT = 0.6, 0.4, 0.8
+    for r in ("C23:G27", "I23:K27", "M23:R27", "U23:U27",            # hyrestabell inmatning (+ marknadshyra O)
+              "G55:K68", "G75:G78", "I75:U78",                        # sektion 4 inmatning, sektion 5 dropdown/motivering
+              "L34:M38"):                                             # kostnadshöjning
+        o += [_fill(KD, r, MID), _font(KD, r, BLACK)]
+    for r in ("H23:H27", "L23:L27", "S23:T27",                        # hyrestabell beräknat
+              "L55:L68", "G69:L70"):                                  # sektion 4 summor
+        o += [_fill(KD, r, DARK), _font(KD, r, BLACK)]
+    for r in ("I34:I39", "H75:H80"):                                  # DoU totalt viktad, restvärde-effekt
+        o += [_fill(KD, r, LIGHT), _font(KD, r, BLACK)]
+    o += [{"op": "inside_h_none", "sheet": KD, "ref": "S23:S27"}]    # inga radlinjer i Budget kr/kvm
     # Diagnostikceller i rad 2 (LEN/ISBLANK) — ingen refererar dem
     o += [{"op": "clear", "sheet": KD, "ref": "F2"}, {"op": "clear", "sheet": KD, "ref": "V2"}]
     # Hjälpområden: dropdown-skala, datatabell, årsvisa hjälptabeller → dolda kolumner

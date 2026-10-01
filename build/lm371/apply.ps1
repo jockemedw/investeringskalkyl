@@ -42,6 +42,7 @@ try {
             "datatable"  { $ws.Range($ref).Table([System.Reflection.Missing]::Value, $ws.Range([string]$o.col_input)) | Out-Null }
             "fill"       { $r = $ws.Range($ref); $r.Interior.Pattern = 1; $r.Interior.ThemeColor = 5; $r.Interior.TintAndShade = [double]$o.tint }
             "hpagebreak" { $ws.HPageBreaks.Add($ws.Range($ref)) | Out-Null }
+            "inside_h_none" { $ws.Range($ref).Borders(12).LineStyle = -4142 }
             "nofill"     { $ws.Range($ref).Interior.Pattern = -4142 }
             "fontcolor"  { $ws.Range($ref).Font.ThemeColor = [int]$o.theme }
             "clear_outline" { $ws.Range($ref).EntireColumn.ClearOutline() | Out-Null }
