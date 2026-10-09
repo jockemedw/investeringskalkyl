@@ -36,3 +36,8 @@ def probe(sheet: str, ref: str) -> dict:
 
 def scan(sheet: str, ref: str) -> dict:
     return {"op": "scan", "sheet": sheet, "ref": ref}
+
+
+def probe_dv(sheet: str, ref: str) -> dict:
+    """Läser Validation.Formula1 (nyckel '<sheet>!<ref>#dv')."""
+    return {"op": "probe_dv", "sheet": sheet, "ref": ref}

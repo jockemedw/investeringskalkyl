@@ -32,6 +32,11 @@ try {
             "replace"    { $ws.Range($ref).Replace([string]$o.find, [string]$o.repl, 2) | Out-Null }
             "dv_list"    { $r = $ws.Range($ref); $r.Validation.Delete(); $r.Validation.Add(3, 1, 1, [string]$o.source) | Out-Null; $r.Validation.InCellDropdown = $true
                            if ($null -ne $o.prompt) { $r.Validation.InputTitle = [string]$o.prompt_title; $r.Validation.InputMessage = [string]$o.prompt } }
+            "dv_custom"  { # en cell per op: relativa referenser i Formula1 tolkas mot aktiv cell, inte mot området
+                           $r = $ws.Range($ref); $r.Validation.Delete(); $r.Validation.Add(7, 1, 1, [string]$o.formula) | Out-Null
+                           $r.Validation.ErrorTitle = [string]$o.err_title; $r.Validation.ErrorMessage = [string]$o.err_msg
+                           if ($null -ne $o.prompt) { $r.Validation.InputTitle = [string]$o.prompt_title; $r.Validation.InputMessage = [string]$o.prompt } }
+            "unmerge"    { $ws.Range($ref).UnMerge() | Out-Null }
             "print_area" { $ws.PageSetup.PrintArea = [string]$o.area }
             "align"      { $ws.Range($ref).HorizontalAlignment = [int]$o.h }
             "wrap"       { $ws.Range($ref).WrapText = $true }
@@ -78,6 +83,7 @@ try {
             "rowheight"  { $ws.Rows($o.row).RowHeight = [double]$o.h }
             "goto"       { $ws.Activate() | Out-Null; $xl.Goto($ws.Range($ref), $true) | Out-Null }
             "probe"      { }
+            "probe_dv"   { }
             "scan"       { }
             default      { throw "Okänd op: $($o.op)" }
         }
@@ -88,6 +94,7 @@ try {
         $sheet = [string]$o.sheet; $ref = [string]$o.ref
         $ws = $wb.Worksheets.Item($sheet)
         if ($o.op -eq "probe") { $probeOut[$sheet + "!" + $ref] = $ws.Range($ref).Value2 }
+        if ($o.op -eq "probe_dv") { try { $probeOut[$sheet + "!" + $ref + "#dv"] = [string]$ws.Range($ref).Validation.Formula1 } catch { $probeOut[$sheet + "!" + $ref + "#dv"] = "" } }
         if ($o.op -eq "scan") {
             $n = 0
             foreach ($c in $ws.Range($ref).Cells) { $v = $c.Value2; if ($v -is [int] -and $v -lt -2146826000) { $n++ } }

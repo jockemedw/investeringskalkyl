@@ -50,13 +50,13 @@ def ops_design() -> list[dict]:
     #    hyrestabellen mörkblå (svart text), DoU-total ljusblå, kostnadshöjning mellanblå svart text.
     MID, DARK, LIGHT = 0.6, 0.4, 0.8
     for r in ("C23:G27", "I23:K27", "M23:R27", "U23:U27",            # hyrestabell inmatning (+ marknadshyra O)
-              "G55:K68", "G75:G78", "I75:U78",                        # sektion 4 inmatning, sektion 5 dropdown/motivering
+              "G55:K68", "G75:G78", "J75:U78",                        # sektion 4 inmatning, sektion 5 dropdown/motivering
               "L34:M38"):                                             # kostnadshöjning
         o += [_fill(KD, r, MID), _font(KD, r, BLACK)]
     for r in ("H23:H27", "L23:L27", "S23:T27",                        # hyrestabell beräknat
               "L55:L68", "G69:L70"):                                  # sektion 4 summor
         o += [_fill(KD, r, DARK), _font(KD, r, BLACK)]
-    for r in ("I34:I39", "H75:H80"):                                  # DoU totalt viktad, restvärde-effekt
+    for r in ("I34:I39", "H75:H80", "I75:I78"):                       # DoU totalt viktad, restvärde-effekt, "Motsvarar"
         o += [_fill(KD, r, LIGHT), _font(KD, r, BLACK)]
     o += [{"op": "inside_h_none", "sheet": KD, "ref": "S23:S27"}]    # inga radlinjer i Budget kr/kvm
     # Diagnostikceller i rad 2 (LEN/ISBLANK) — ingen refererar dem
@@ -84,7 +84,7 @@ def ops_design() -> list[dict]:
     o += [_page(FS, PORTRAIT, A4, "$A$1:$H$138"),
           _page(KD, LANDSCAPE, A3, "$C$3:$U$81", tall=1),
           _page(FIN, LANDSCAPE, A3, "$A$3:$W$57", titles_cols="$A:$C", wide=2),
-          _page(NPV, LANDSCAPE, A3, "$B$1:$Y$82", titles_cols="$A:$C", wide=2),
+          _page(NPV, LANDSCAPE, A3, "$B$1:$Y$90", titles_cols="$A:$C", wide=2),
           _page(IRR, LANDSCAPE, A3, "$A$1:$W$61", titles_cols="$A:$C", wide=2),
           _page(ACK, LANDSCAPE, A3, "$A$1:$W$13", tall=1, titles_cols="$A:$B", wide=2),
           _page(GRAF, LANDSCAPE, A3, "$A$38:$W$57", tall=1, titles_cols="$A:$B", wide=2),
