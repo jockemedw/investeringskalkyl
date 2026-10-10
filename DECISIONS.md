@@ -203,4 +203,12 @@ Beslut som har tagits genom projektet, med motivering. Varje beslut är låst om
 
 ---
 
+## D-27: Restvärdesmodell v3.1 — ett restvärde, risken prissätts en gång
+**Beslut (Joakim 2026-10-09, A–E):** (A) Kalkylränta restvärde `M8 = M6 + M9` — OMPRÖVAR beslut 2 i ANALYS_OMTAG (M8 följde justerad yield). (B) Vakansfaktorn får egen asymmetrisk skala −0,25/0/+0,50/+1,00/+2,00 pp med live-visning av ekvivalent vakans. (C) Restvärdet definieras en gång (flik 4 rad 88/89: kapitaliseringsbart driftnetto år t+1 / justerad yield) och läses av krav 1, 2, 3 och Grafer. (D) Vakansgrad (P23:P27) gäller bara år efter avtalsslut inom kalkylperioden; kapitaliserat driftnetto räknas alltid fullt uthyrt; spärr + notis. (E) Extraordinärt UH t.o.m. horisonten, `5. IRR!B12:C12` bort.
+**Motivering:** Faktorerna beskriver objektets kassaflödesrisk och prissätts i marknadsvärderingen (kapitaliseringen). Nuvärdesberäkningen av exitvärdet ska spegla marknadens generella avkastningskrav (yield = r − g ⇒ r = yield + inflation), inte objektets risk en gång till. Med kopplad M8 gav +0,9 pp på yielden ≈ dubbel NPV-effekt mot motsvarande 10 % vakans (−13,6 mot −6,4 Mkr) men samma IRR-effekt — ingen skala kunde kalibreras för alla tre kraven. NPV- och IRR-spåret kapitaliserade olika år (271,9 mot 268,5 Mkr); vakansgraden slog bara på NPV-spårets restvärde.
+**Konsekvens:** Avsiktliga brott mot baslinjen (mallexemplet): IRR 8,032 → 8,080 %, legacy-vikter 6,306 → 6,333 %, NPV-känslighet ±1 pp 32,8/−4,5 → 20,0/3,2 Mkr. NPV/PV-krav och kravhyra oförändrade. Detaljer: [build/lm371/REGRESSION_v3.1.md](build/lm371/REGRESSION_v3.1.md).
+**Verifierat:** 2026-10-10 — LM371_v3.xlsx byggd via XML (`build_xml.py`, Excel saknas i miljön), regression.py grön mot filen i LibreOffice. Excel räknar om vid öppning (fullCalcOnLoad).
+
+---
+
 *Lägg till nya beslut längst ner med löpande nummer. Ändra ALDRIG befintliga — markera som "OMPRÖVAD i D-XX" om de ersätts.*

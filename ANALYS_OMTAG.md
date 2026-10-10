@@ -89,7 +89,7 @@ huvudkostnaden för varje punkt ovan och skälet till att insatserna är "liten"
 ## Beslut tagna 2026-09-30 (Joakim, batch)
 
 1. Vikter `5. IRR!A6:A8` default 0/1/0, kvar som synlig inmatning med not.
-2. `M8` kalkylränta restvärde följer justerad yield.
+2. `M8` kalkylränta restvärde följer justerad yield. **OMPRÖVAT 2026-10-09 (beslut 11): M8 = M6 + M9.**
 3. Steg ±0,25/±0,50 pp symmetrisk.
 4. Kravhyra som output: **ska med**.
 5. Bladskydd/valideringar: nej.
@@ -114,3 +114,24 @@ Pipeline: `build/lm371/patch.ps1` (Excel COM) styrd av `build/lm371/build.py`; k
 Steg 1–3 = restvärdesmodellen (Joakims krav). Steg 4 = Bef/bokfört värde. Steg 5–6 = känslighet + kravhyra. Varje steg committas separat med grön regression.
 
 **Fas 1 klar 2026-09-30.** Produkt: `build/lm371/LM371_v3.xlsx`. Dokumentation och lathundstillägg: [build/lm371/LM371_v3.md](build/lm371/LM371_v3.md).
+
+## Beslut 11–15 (2026-10-09, Joakim) — restvärdesmodell v3.1 efter granskning
+
+Granskningen fann att (i) vakansrisk kunde anges på två ställen (vakansgrad P23:P27 och faktorn
+"långsiktig vakansrisk"), (ii) faktorn med kopplad M8 slog dubbelt i krav 1/3 men enkelt i krav 2,
+och (iii) NPV-spåret kapitaliserade år N+1 men IRR-spåret år N.
+
+11. (A) `M8 = M6 + M9`. Ersätter beslut 2. Objektets risk prissätts en gång, i kapitaliseringen;
+    diskonteringen speglar marknadens generella krav (yield = r − g ⇒ r = yield + inflation).
+    Känsligheten (±1 pp exit-yield) diskonteras med M8.
+12. (B) Vakansfaktorn: Låg −0,25 / Normal 0 / Förhöjd +0,50 / Hög +1,00 / Mycket hög +2,00 pp.
+    Kolumn I på flik 2 visar ekvivalent vakans live (överskottsgrad år N+1 × Δ / M11). Övriga faktorer ±0,25/±0,50.
+    Extremfall: manuell överstyrning 5. IRR C11.
+13. (C) Ett restvärde: flik 4 rad 88 (tillkommande) / 89 (hela) = kapitaliseringsbart driftnetto år t+1 / M11.
+    NPV E79/C79, E50/C50, IRR rad 7 och C7 (= E79), Grafer rad 44 läser därifrån.
+14. (D) Vakansgrad gäller bara år efter avtalsslut inom kalkylperioden. Kapitaliserat driftnetto räknas fullt
+    uthyrt (rad 86/87). Datavalidering spärrar P23:P27 när avtalet täcker kalkylperioden; notis i I17.
+15. (E) Extraordinärt UH summeras t.o.m. horisonten (C49/E49/C78/E78; tidigare även år 11–21 i
+    10-årsvarianten och år 21 i 20-årsvarianten). C50/C79 normaliserade via 13. `5. IRR!B12:C12` rensade.
+
+Effekter och regression: [build/lm371/REGRESSION_v3.1.md](build/lm371/REGRESSION_v3.1.md).

@@ -7,6 +7,8 @@
 (d) Icke-neutral bedömning flyttar yield, exit, IRR och NPV åt rätt håll.
 (e) Tom investeringsmatris → tvingande-vakt + blanka resultat.
 (f) Bef-rad + befintligt bokfört värde påverkar bara krav 3 (hela fastigheten).
+(g) v3.1 (beslut A–E 2026-10-09): ett restvärde i alla krav (flik 4 rad 88/89), M8 = M6 + M9,
+    vakansfaktorns skala + ekvivalent vakans, vakansgradens tidsdomän, extraordinärt UH t.o.m. horisonten.
 
 Kör:  python build/lm371/regression.py   (mot build/lm371/LM371_v3.xlsx)
 """
@@ -16,7 +18,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from comrun import run, probe, scan  # noqa: E402
+from comrun import run, probe, probe_dv, scan  # noqa: E402
 
 KD = "2. Kalkyldata"
 IRR = "5. IRR"
@@ -26,8 +28,11 @@ FIN = "3. Finansiering"
 BASE_NPV, BASE_IRR, BASE_PV = 10300.0, 0.0629828143787814, 10300.0   # källmallen (orörd)
 # v3-pinnar. Fas 2 F2 (CA-index ^(år−1) i stället för ^år från år 2) höjer IRR marginellt:
 # rent MV 8,0257 % → 8,0324 %; legacy-vikter 0/0,4/0,6: 6,2983 % → LEGACY_IRR nedan. NPV/PV opåverkade.
-V3_IRR = 0.08032406218316468
-LEGACY_IRR = 0.06306226827590034      # fas 2 F2: källans 6,2983 % + CA-fix (COM 2026-09-30)
+# v3.1 (beslut C): IRR-exit = restvärde år N+1-driftnetto (= NPV-spårets) → 8,0324 % → 8,0804 %;
+# legacy 0/0,4/0,6: 6,3062 % → 6,3333 %. Avsiktliga brott mot baslinjen, se REGRESSION_v3.1.md.
+V3_IRR = 0.08080374302175485          # v3: 0.08032406218316468
+LEGACY_IRR = 0.063333409992863        # v3: 0.06306226827590034 (källans 6,2983 % + CA-fix)
+EXIT_V31 = 271_940_000                # = 4. NPV!E79 (v3: 5. IRR!C7 = 268 500 000 på år N-driftnetto)
 TOL_IRR = 1e-6
 
 PROBES = [probe(KD, "D13"), probe(KD, "D14"), probe(KD, "D15"),
@@ -66,13 +71,13 @@ def check_v3(res: dict) -> None:
             fails.append(label)
     want("NPV D13 oförändrad", _close(_p(res, KD, "D13"), BASE_NPV, 1))
     want("PV vs BV D15 oförändrad", _close(_p(res, KD, "D15"), BASE_PV, 1))
-    want("IRR D14 = rent MV 8,026 %", _close(_p(res, KD, "D14"), V3_IRR, TOL_IRR))
+    want("IRR D14 = rent MV, exit på N+1 (8,080 %)", _close(_p(res, KD, "D14"), V3_IRR, TOL_IRR))
     want("M10 = 0 vid Neutralt", _close(_p(res, KD, "M10"), 0.0, 1e-12))
     want("M11 = M6", _close(_p(res, KD, "M11"), _p(res, KD, "M6"), 1e-12))
-    want("M8 = M11 + inflation (0,085)", _close(_p(res, KD, "M8"), 0.085, 1e-12))
+    want("M8 = M6 + inflation (0,085)", _close(_p(res, KD, "M8"), 0.085, 1e-12))
     want("S23 = 240 Mkr / area", _close(_p(res, KD, "S23"), 240_000_000 / _p(res, KD, "H23"), 1e-6))
     want("Matris G69 = 240 Mkr", _close(_p(res, KD, "G69"), 240_000_000, 0.5))
-    want("Exit C10 = 268,5 Mkr (rent MV)", _close(_p(res, IRR, "C10"), 268_500_000, 0.5))
+    want("Exit C10 = 271,94 Mkr (rent MV, = NPV E79)", _close(_p(res, IRR, "C10"), EXIT_V31, 0.5))
     want("Vikter 0/1/0", _p(res, IRR, "A7") == 1 and _p(res, IRR, "A8") == 0)
     want("NPV tillkommande = NPV hela utan Bef-rader", _close(_p(res, NPV, "E82"), _p(res, NPV, "E59"), 0.5))
     for k, n in res["errors"].items():
@@ -90,17 +95,17 @@ def check_legacy_weights(v3: Path) -> None:
     res = run(v3, ops)
     assert _close(_p(res, KD, "D14"), LEGACY_IRR, TOL_IRR), f"Legacy-vikter ger inte pinnad IRR: {res}"
     assert _close(_p(res, KD, "D13"), BASE_NPV, 1) and _close(_p(res, KD, "D15"), BASE_PV, 1), res
-    print(f"  legacy 0/0,4/0,6 → IRR {_p(res, KD, 'D14'):.6%} (källa 6,2983 % + CA-fix) ✓")
+    print(f"  legacy 0/0,4/0,6 → IRR {_p(res, KD, 'D14'):.6%} (källa 6,2983 % + CA-fix + exit N+1) ✓")
 
 
 def check_adjustment(v3: Path) -> None:
-    """Mycket negativt på en faktor: +0,50 pp → M11 = 7,0 %, exit = MV vid 7,0 %, IRR/NPV lägre."""
+    """Mycket negativt på en faktor: +0,50 pp → M11 = 7,0 %, exit = MV vid 7,0 %, IRR/NPV lägre, M8 oförändrad (A)."""
     ops = [{"op": "set", "sheet": KD, "ref": "G75", "value": "Mycket negativt"},
            probe(KD, "M10"), probe(KD, "M11"), probe(KD, "M8"), probe(KD, "D13"), probe(KD, "D14"), probe(IRR, "C10")]
     res = run(v3, ops)
     assert _close(_p(res, KD, "M10"), 0.005, 1e-12) and _close(_p(res, KD, "M11"), 0.07, 1e-12), res
-    assert _close(_p(res, KD, "M8"), 0.09, 1e-12), res
-    assert _close(_p(res, IRR, "C10"), round(268_500_000 * 0.065 / 0.07 / 1e5) * 1e5, 0.5), res
+    assert _close(_p(res, KD, "M8"), 0.085, 1e-12), res
+    assert _close(_p(res, IRR, "C10"), round(EXIT_V31 * 0.065 / 0.07 / 1e4) * 1e4, 1e4), res
     assert _p(res, KD, "D14") < V3_IRR and _p(res, KD, "D13") < BASE_NPV, res
     print(f"  +0,50 pp → yield 7,0 %, exit {_p(res, IRR, 'C10'):,.0f}, IRR {_p(res, KD, 'D14'):.4%}, NPV {_p(res, KD, 'D13'):,.0f} tkr ✓")
 
@@ -252,8 +257,8 @@ def check_fas2(v3: Path) -> None:
         fails.append("F5 testet exercerar inte negativt PV")
     # formeltext: fångar tysta Replace-missar (Replace arbetar mot FormulaLocal)
     wb = openpyxl.load_workbook(v3)
-    for sh, ref, must in ((NPV, "E13", "MAX('2. Kalkyldata'!$M24,$D$4)"), (NPV, "C48", "ROUND(("), (NPV, "E50", "$M$11"),
-                          (NPV, "D28", "$P$5:$R$5,"), (IRR, "C7", "ROUND(("), ("7.Grafer", "C40", "$72)"), (IRR, "E23", "$71)")):
+    for sh, ref, must in ((NPV, "E13", "MAX('2. Kalkyldata'!$M24,$D$4)"), (NPV, "C48", "ROUND(("), (NPV, "E50", "$D$4:$BA$89"),
+                          (NPV, "D28", "$P$5:$R$5,"), (IRR, "C7", "'4. NPV'!$E$79"), ("7.Grafer", "C40", "$72)"), (IRR, "E23", "$71)")):
         fv = wb[sh][ref].value
         if not (isinstance(fv, str) and must in fv):
             fails.append(f"formeltext {sh}!{ref} saknar {must!r}: {str(fv)[:90]}")
@@ -269,6 +274,89 @@ def check_fas2(v3: Path) -> None:
     print(f"  fas 2: index ^0/^1/^2 ✓, PV=W före kalkylstart ✓, LOOKUP ✓, hyra 0 → NPV {_p(res2, KD, 'D13'):,.0f} tkr utan #NUM! ✓, 0 #REF! ✓")
 
 
+def check_restvarde_v31(v3: Path) -> None:
+    """v3.1, beslut A–E. Kolumner flik 4: W = år 20 (2045), X = år 21, M = 2035, N = 2036, R = 2040."""
+    def kd(ref, v):
+        return {"op": "set", "sheet": KD, "ref": ref, "value": v}
+    BASE = [probe(KD, "D13"), probe(KD, "D14"), probe(KD, "D15"), probe(KD, "M6"), probe(KD, "M8"), probe(KD, "M9"),
+            probe(KD, "M11"), probe(KD, "H76"), probe(KD, "I76"), probe(KD, "I17"), probe(KD, "AM23"),
+            probe(IRR, "C7"), probe(IRR, "C10"), probe(IRR, "W7"), probe(IRR, "B12"), probe(IRR, "C12"),
+            probe(NPV, "C49"), probe(NPV, "E49"), probe(NPV, "C50"), probe(NPV, "E50"),
+            probe(NPV, "C78"), probe(NPV, "E78"), probe(NPV, "C79"), probe(NPV, "E79"),
+            probe(NPV, "W88"), probe(NPV, "W89"), probe(NPV, "X86"), probe(NPV, "X90"), probe(NPV, "M88"),
+            probe(NPV, "N18"), probe(NPV, "W18"), probe(NPV, "W12"), probe("7.Grafer", "V44")]
+    fails = []
+
+    def want(label, ok):
+        if not ok:
+            fails.append(label)
+    b = run(v3, BASE + [probe_dv(KD, f"P{r}") for r in range(23, 28)] + [scan(NPV, "B84:BA90")])
+    P = lambda res, s, r: _p(res, s, r)  # noqa: E731
+    # C — ett restvärde: IRR-exit, krav 1, krav 3 och Grafer läser samma definitionsrad
+    want("C: IRR C7 = NPV E79", P(b, IRR, "C7") == P(b, NPV, "E79"))
+    want("C: E79 = rad 88 år N (avrundat)", _close(P(b, NPV, "E79"), round(P(b, NPV, "W88") / 1e4) * 1e4, 0.5))
+    want("C: E50 = rad 89 år N (avrundat)", _close(P(b, NPV, "E50"), round(P(b, NPV, "W89") / 1e4) * 1e4, 0.5))
+    want("C: rad 88 år N = driftnetto år N+1 / M11", _close(P(b, NPV, "W88"), P(b, NPV, "X86") / P(b, KD, "M11"), 1e-3))
+    want("C: C79 = rad 88 år 10", _close(P(b, NPV, "C79"), round(P(b, NPV, "M88") / 1e4) * 1e4, 0.5))
+    want("C: IRR rad 7 och Grafer rad 44 = rad 88", P(b, IRR, "W7") == P(b, NPV, "W88") == P(b, "7.Grafer", "V44"))
+    # A — kalkylränta restvärde frikopplad
+    want("A: M8 = M6 + M9", _close(P(b, KD, "M8"), P(b, KD, "M6") + P(b, KD, "M9"), 1e-12))
+    # E — vilseledande PV-cell borta
+    want("E: 5. IRR B12:C12 tomma", P(b, IRR, "B12") in ("", None) and P(b, IRR, "C12") in ("", None))
+    want(f"B: I76 = '≈ 0 %' vid Normal ({P(b, KD, 'I76')!r})", P(b, KD, "I76") == "≈ 0 %")
+    for r in range(23, 28):
+        dv = b["probes"].get(f"{KD}!P{r}#dv")
+        if dv is not None:                                   # None = ej läsbart (LibreOffice, steg 1)
+            want(f"D: validering P{r} = {dv!r}", f"$AM${r}" in dv and f"$P${r}=0" in dv)
+    for k, n in b["errors"].items():
+        want(f"felvärden i {k}: {n}", n == 0)
+    # B — vakansfaktorn Hög: +1,00 pp, M8 oförändrad, ekvivalent vakans = överskottsgrad × Δ / M11
+    h = run(v3, [kd("G76", "Hög")] + BASE)
+    v_eq = P(b, NPV, "X86") / P(b, NPV, "X90") * 0.01 / (P(b, KD, "M6") + 0.01)
+    want(f"B: H76 = +1,00 pp ({P(h, KD, 'H76')})", _close(P(h, KD, "H76"), 0.01, 1e-12))
+    want("B: M11 = M6 + 1 pp", _close(P(h, KD, "M11"), P(b, KD, "M6") + 0.01, 1e-12))
+    want("A+B: M8 oförändrad vid faktorjustering", _close(P(h, KD, "M8"), P(b, KD, "M8"), 1e-12))
+    want(f"B: I76 = '≈ {round(v_eq * 100)} %' ({P(h, KD, 'I76')!r})", P(h, KD, "I76") == f"≈ {round(v_eq * 100)} %")
+    # ekvivalensen: samma exit som vakans v_eq dragen ur kapitaliseringen vid extern yield
+    exit_vak = (P(b, NPV, "X86") - v_eq * P(b, NPV, "X90")) / P(b, KD, "M6")
+    want("B: exit vid Hög = exit med ekvivalent vakans", _close(P(h, NPV, "E79"), round(exit_vak / 1e4) * 1e4, 1e4))
+    want("B: Hög sänker NPV och IRR", P(h, KD, "D13") < P(b, KD, "D13") and P(h, KD, "D14") < P(b, KD, "D14"))
+    lo_ = run(v3, [kd("G76", "Låg"), probe(KD, "H76"), probe(KD, "I76")])
+    want(f"B: Låg = −0,25 pp, I76 negativ ({P(lo_, KD, 'I76')!r})",
+         _close(P(lo_, KD, "H76"), -0.0025, 1e-12) and str(P(lo_, KD, "I76")).startswith("≈ −"))
+    # D — avtal täcker kalkylperioden: vakansgrad utan effekt + notis
+    d1 = run(v3, [kd("P23", 0.10)] + BASE)
+    want("D: AM23 = FALSE när avtalet täcker perioden", not P(b, KD, "AM23"))
+    want(f"D: notis i I17 ({P(d1, KD, 'I17')!r})", "Vakansgrad utan effekt" in str(P(d1, KD, "I17")))
+    for s_, r_ in ((KD, "D13"), (KD, "D14"), (KD, "D15"), (NPV, "E79"), (NPV, "E50")):
+        want(f"D: {s_}!{r_} oförändrad när avtalet täcker perioden", _close(P(d1, s_, r_), P(b, s_, r_), 1e-9))
+    # D — avtal t.o.m. 2035: vakans 2036–2045 i kassaflödet, restvärdet fullt uthyrt
+    d2 = run(v3, [kd("N23", 2035), kd("P23", 0.10)] + BASE)
+    want("D: AM23 = TRUE vid avtal t.o.m. 2035", bool(P(d2, KD, "AM23")))
+    want("D: vakans år 2045 = 10 % av intäkten", _close(P(d2, NPV, "W18"), -0.10 * P(d2, NPV, "W12"), 1))
+    want("D: vakans 2036 ≠ 0", P(d2, NPV, "N18") < 0)
+    want("D: restvärdet oförändrat (fullt uthyrt)", _close(P(d2, NPV, "E79"), P(b, NPV, "E79"), 0.5)
+         and _close(P(d2, NPV, "E50"), P(b, NPV, "E50"), 0.5))
+    want("D: NPV sjunker av vakansen inom perioden", P(d2, KD, "D13") < P(b, KD, "D13"))
+    want("D: ingen notis när vakansgraden har effekt", "Vakansgrad utan effekt" not in str(P(d2, KD, "I17")))
+    # E — extraordinärt UH: år N+1 utanför horisonten; år 15 bara i NPV 20; restvärdet normaliserat
+    uh = [kd("Q34", "Skola"), kd("S34", 500)]
+    e1 = run(v3, uh + [kd("R34", 2046)] + BASE)
+    want(f"E: UH år N+1 → E49/E78 = 0 ({P(e1, NPV, 'E49')}/{P(e1, NPV, 'E78')})",
+         P(e1, NPV, "E49") == 0 and P(e1, NPV, "E78") == 0)
+    want("E: UH år N+1 påverkar inte NPV eller restvärde", _close(P(e1, KD, "D13"), P(b, KD, "D13"), 1)
+         and _close(P(e1, NPV, "E79"), P(b, NPV, "E79"), 0.5))
+    e2 = run(v3, uh + [kd("R34", 2040)] + BASE)
+    want(f"E: UH 2040 → C49/C78 = 0, E78 < 0 ({P(e2, NPV, 'C78')}/{P(e2, NPV, 'E78')})",
+         P(e2, NPV, "C49") == 0 and P(e2, NPV, "C78") == 0 and P(e2, NPV, "E78") < 0)
+    want("E: UH 2040 → restvärde år 10 och 20 oförändrat", _close(P(e2, NPV, "C79"), P(b, NPV, "C79"), 0.5)
+         and _close(P(e2, NPV, "E79"), P(b, NPV, "E79"), 0.5))
+    if fails:
+        raise AssertionError("V3.1 RÖD:" + chr(10) + "  - " + (chr(10) + "  - ").join(fails))
+    print(f"  v3.1: C7 = E79 = {P(b, NPV, 'E79'):,.0f} ✓, M8 = M6 + M9 ✓, Hög → {P(h, KD, 'I76')} ✓, "
+          f"vakansgrad spärr/notis ✓, UH t.o.m. horisonten ✓")
+
+
 def run_all(v3: Path, res: dict | None = None) -> None:
     check_v3(res if res is not None else run(v3, PROBES))
     check_legacy_weights(v3)
@@ -278,6 +366,7 @@ def run_all(v3: Path, res: dict | None = None) -> None:
     check_sensitivity(v3)
     check_kravhyra(v3)
     check_fas2(v3)
+    check_restvarde_v31(v3)
     print("REGRESSION GRÖN")
 
 
