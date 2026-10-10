@@ -1,7 +1,7 @@
 """Indikativ regressionsgate i LibreOffice (steg 1) — när Excel COM saknas (Linux/moln).
 
 Kör den riktiga regression.py med comrun ersatt av en LibreOffice-motor (UNO):
-    python build/lm371/lo_gate.py                 # bygger prototyp = LM371_v3.xlsx + step7-ops, kör gaten
+    python build/lm371/lo_gate.py                 # kör gaten mot LM371_v3.xlsx
     python build/lm371/lo_gate.py <fil.xlsx>      # kör gaten mot given fil
 
 Begränsningar (verifieras bara i Excel, steg 2): ops appliceras med openpyxl på en kopia — format,
@@ -43,6 +43,8 @@ class LO:
         self.proc = subprocess.Popen(
             ["soffice", "--headless", "--norestore", "--nologo", f"-env:UserInstallation=file://{self.prof}",
              f"--accept=socket,host=localhost,port={self.port};urp;"],
+            # svensk locale: tal → text i formler ("6,5 %") som i Excel på svenska
+            env=dict(os.environ, LANG="sv_SE.UTF-8", LC_ALL="sv_SE.UTF-8"),
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         local = uno.getComponentContext()
         res = local.ServiceManager.createInstanceWithContext("com.sun.star.bridge.UnoUrlResolver", local)
@@ -196,18 +198,12 @@ def main() -> int:
     sys.modules["comrun"] = types.SimpleNamespace(run=run, probe=probe, probe_dv=probe_dv, scan=scan)
     sys.path.insert(0, str(HERE))
     import regression as R
-    from step7_restvarde import ops_restvarde_v31, ops_historik_v31
-    if len(sys.argv) > 1:
-        target = Path(sys.argv[1])
-    else:
-        target = Path(tempfile.mkdtemp()) / "LM371_v31_proto.xlsx"
-        apply_openpyxl(HERE / "LM371_v3.xlsx", ops_restvarde_v31() + ops_historik_v31(), target)
-        print(f"Prototyp: {target}")
+    target = Path(sys.argv[1]) if len(sys.argv) > 1 else HERE / "LM371_v3.xlsx"
     print("Baslinje källa …", end=" ", flush=True)
     R.check_source_baseline(HERE / "source" / "LM371_source.xlsx")
     print("ok")
     R.run_all(target)
-    print("(LibreOffice — indikativ. Slutlig gate: python build/lm371/build.py med Excel.)")
+    print("(LibreOffice. Med Excel: python build/lm371/build.py — kanonisk helbyggnad.)")
     return 0
 
 

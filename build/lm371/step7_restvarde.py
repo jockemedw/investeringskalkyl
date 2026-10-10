@@ -18,7 +18,7 @@ from step5_kanslighet import S_OPT, S_BED, S_PES
 
 # ── Flik 4: definitionsblock ──
 R_HDR, R_VAK, R_KDN_T, R_KDN_H, R_RV_T, R_RV_H, R_BH_T = range(84, 91)
-NPV_PRINT_LAST = R_BH_T
+NPV_PRINT_LAST = R_BH_T + 1
 IDX = {r: r - 3 for r in (R_KDN_T, R_RV_T, R_RV_H, R_BH_T)}        # HLOOKUP-index i $D$4:$BA$r
 # ── Flik 2 ──
 VAK_ROW = 76                                                     # "Långsiktig vakansrisk" i sektion 5
@@ -42,7 +42,7 @@ def ops_restvarde_v31() -> list[dict]:
           _set(KD, "C73", v="Extern direktavkastning (M6) är utgångsläget. Bedömningarna justerar kapitaliseringen (M11) "
                             "i alla tre kraven, ±0,25/±0,50 pp per faktor (vakansrisk −0,25…+2,00). "
                             "Kalkylränta restvärde = M6 + inflation."),
-          _set(KD, "C80", v="Justerad direktavkastning (M11) — kapitaliserar restvärdet i NPV, PV-krav och IRR"),
+          _set(KD, "C80", v="Justerad direktavkastning (M11)"),
           ]
     for r in (S_OPT, S_BED, S_PES):
         # scenariot flyttar bara kapitaliseringen (exit-yield); diskontering = dagens krav M8
@@ -52,16 +52,19 @@ def ops_restvarde_v31() -> list[dict]:
 
     # ── C + D: definitionsblock på flik 4 ──
     o += [_fmt(NPV, "B47:E47", f"B{R_HDR}:E{R_HDR}"),
-          _set(NPV, f"B{R_HDR}", v="RESTVÄRDE — år t = kapitaliseringsbart driftnetto år t+1 / justerad yield (M11)"),
+          _set(NPV, f"B{R_HDR}", v="RESTVÄRDE — driftnetto år t+1 / justerad yield (M11)"),
           _fmt(NPV, "B20", f"B{R_VAK}:B{R_BH_T}"), _fmt(NPV, "C20", f"C{R_VAK}:C{R_BH_T}"),
           _fmt(NPV, "D20:BA20", f"D{R_VAK}:BA{R_BH_T}"),
           _fmt(NPV, "B29", f"B{R_RV_T}:B{R_RV_H}"), _fmt(NPV, "D29:BA29", f"D{R_RV_T}:BA{R_RV_H}"),
           _set(NPV, f"B{R_VAK}", v="Vakans tillkommande (efter avtal)"),
-          _set(NPV, f"B{R_KDN_T}", v="Kapitaliseringsbart driftnetto tillkommande (fullt uthyrt, exkl extraordinärt UH)"),
-          _set(NPV, f"B{R_KDN_H}", v="Kapitaliseringsbart driftnetto hela fastigheten"),
-          _set(NPV, f"B{R_RV_T}", v="Restvärde tillkommande vid årets slut (krav 1 och 2)"),
-          _set(NPV, f"B{R_RV_H}", v="Restvärde hela fastigheten vid årets slut (krav 3)"),
-          _set(NPV, f"B{R_BH_T}", v="Bruttohyra tillkommande (för ekvivalent vakans, flik 2)"),
+          _set(NPV, f"B{R_KDN_T}", v="Kapitaliseringsbart driftnetto, tillkommande"),
+          _set(NPV, f"B{R_KDN_H}", v="Kapitaliseringsbart driftnetto, hela fastigheten"),
+          _set(NPV, f"B{R_RV_T}", v="Restvärde tillkommande, årets slut (krav 1–2)"),
+          _set(NPV, f"B{R_RV_H}", v="Restvärde hela fastigheten, årets slut (krav 3)"),
+          _set(NPV, f"B{R_BH_T}", v="Bruttohyra tillkommande (ekvivalent vakans)"),
+          _set(NPV, f"B{R_BH_T + 1}", v="Kapitaliseringsbart driftnetto = fullt uthyrt (vakans efter avtal återlagd), "
+                                       "exkl extraordinärt UH. Restvärdet år t läser år t+1."),
+          {"op": "italic", "sheet": NPV, "ref": f"B{R_BH_T + 1}"},
           {"op": "print_area", "sheet": NPV, "area": f"$B$1:$Y${NPV_PRINT_LAST}"},
           ]
     for X in YEAR_COLS:
@@ -103,7 +106,7 @@ def ops_restvarde_v31() -> list[dict]:
     for i, (lbl, pp) in enumerate(VAK_SKALA):
         o += [_set(KD, f"AK{5 + i}", v=lbl), _set(KD, f"AL{5 + i}", v=pp)]
     # Motivering flyttar I:U → J:U; I = "Motsvarar"
-    o += [_set(KD, "I74", v="Motsvarar"), _fmt(KD, "I74", "J74"), _set(KD, "J74", v="Motivering"),
+    o += [_set(KD, "I74", v="Motsv. vakans"), _fmt(KD, "I74", "J74"), _set(KD, "J74", v="Motivering"),
           {"op": "align", "sheet": KD, "ref": "I74", "h": CENTER}]
     for r in S5_ROWS:
         o += [{"op": "unmerge", "sheet": KD, "ref": f"I{r}:U{r}"},
@@ -120,14 +123,17 @@ def ops_restvarde_v31() -> list[dict]:
                       "Hög +1,00 / Mycket hög +2,00 pp. Kolumn I visar motsvarande vakans. Extremfall: överstyr "
                       "restvärdet i 5. IRR C11.")},
           _set(KD, f"H{VAK_ROW}", f=f"=IFERROR(INDEX($AL$5:$AL$9,MATCH(G{VAK_ROW},$AK$5:$AK$9,0)),0)"),
-          _set(KD, f"I{VAK_ROW}", f=(f'=IFERROR(IF(H{VAK_ROW}=0,"marknadsnormal",IF(H{VAK_ROW}>0,'
-                                     f'"≈ "&ROUND(({v})*100,0)&" % vakans",'
-                                     f'"≈ "&ROUND(-({v})*100,0)&" % lägre vakans")),"")')),
+          # "≈ 11 %" = vakans utöver vad extern yield prisar; "≈ −3 %" = lägre än marknadens antagande
+          _set(KD, f"I{VAK_ROW}", f=(f'=IFERROR(IF(H{VAK_ROW}=0,"≈ 0 %",IF(H{VAK_ROW}>0,"≈ ","≈ −")'
+                                     f'&ROUND(ABS({v})*100,0)&" %"),"")')),
           ]
 
     # ── D: vakansgradens tidsdomän ──
-    o += [_set(KD, "P21", v="Vakans efter avtal"), _fmt(KD, "O22", "P22"),
-          _set(KD, "P22", v="år inom kalkylperioden"), {"op": "wrap", "sheet": KD, "ref": "P22"},
+    o += [_fmt(KD, "O22", "P22"), _set(KD, "P22", v="efter avtal, inom kalkylperioden"),
+          {"op": "wrap", "sheet": KD, "ref": "P22"},
+          # mallens visning av viktad vakansgrad (flik 1 rad 88) — samma tidsdomän
+          _set(KD, "K14", v="Vakans efter avtal, viktad"),
+          _set(FS, "B88", v="Vakans efter avtal inom kalkylperioden (viktad)"),
           _set(KD, f"{AVTAL_OK}22", v="Vakansgrad tillåten (avtal slutar före kalkylperiodens sista år)")]
     for r in range(23, 28):
         o += [_set(KD, f"{AVTAL_OK}{r}", f=f'=OR(N{r}="",N{r}<{SLUTAR})'),

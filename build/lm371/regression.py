@@ -303,7 +303,7 @@ def check_restvarde_v31(v3: Path) -> None:
     want("A: M8 = M6 + M9", _close(P(b, KD, "M8"), P(b, KD, "M6") + P(b, KD, "M9"), 1e-12))
     # E — vilseledande PV-cell borta
     want("E: 5. IRR B12:C12 tomma", P(b, IRR, "B12") in ("", None) and P(b, IRR, "C12") in ("", None))
-    want("B: I76 = marknadsnormal vid Normal", P(b, KD, "I76") == "marknadsnormal")
+    want(f"B: I76 = '≈ 0 %' vid Normal ({P(b, KD, 'I76')!r})", P(b, KD, "I76") == "≈ 0 %")
     for r in range(23, 28):
         dv = b["probes"].get(f"{KD}!P{r}#dv")
         if dv is not None:                                   # None = ej läsbart (LibreOffice, steg 1)
@@ -316,14 +316,14 @@ def check_restvarde_v31(v3: Path) -> None:
     want(f"B: H76 = +1,00 pp ({P(h, KD, 'H76')})", _close(P(h, KD, "H76"), 0.01, 1e-12))
     want("B: M11 = M6 + 1 pp", _close(P(h, KD, "M11"), P(b, KD, "M6") + 0.01, 1e-12))
     want("A+B: M8 oförändrad vid faktorjustering", _close(P(h, KD, "M8"), P(b, KD, "M8"), 1e-12))
-    want(f"B: I76 = '≈ {round(v_eq * 100)} % vakans' ({P(h, KD, 'I76')!r})", P(h, KD, "I76") == f"≈ {round(v_eq * 100)} % vakans")
+    want(f"B: I76 = '≈ {round(v_eq * 100)} %' ({P(h, KD, 'I76')!r})", P(h, KD, "I76") == f"≈ {round(v_eq * 100)} %")
     # ekvivalensen: samma exit som vakans v_eq dragen ur kapitaliseringen vid extern yield
     exit_vak = (P(b, NPV, "X86") - v_eq * P(b, NPV, "X90")) / P(b, KD, "M6")
     want("B: exit vid Hög = exit med ekvivalent vakans", _close(P(h, NPV, "E79"), round(exit_vak / 1e4) * 1e4, 1e4))
     want("B: Hög sänker NPV och IRR", P(h, KD, "D13") < P(b, KD, "D13") and P(h, KD, "D14") < P(b, KD, "D14"))
     lo_ = run(v3, [kd("G76", "Låg"), probe(KD, "H76"), probe(KD, "I76")])
-    want(f"B: Låg = −0,25 pp med 'lägre vakans' ({P(lo_, KD, 'I76')!r})",
-         _close(P(lo_, KD, "H76"), -0.0025, 1e-12) and "lägre vakans" in str(P(lo_, KD, "I76")))
+    want(f"B: Låg = −0,25 pp, I76 negativ ({P(lo_, KD, 'I76')!r})",
+         _close(P(lo_, KD, "H76"), -0.0025, 1e-12) and str(P(lo_, KD, "I76")).startswith("≈ −"))
     # D — avtal täcker kalkylperioden: vakansgrad utan effekt + notis
     d1 = run(v3, [kd("P23", 0.10)] + BASE)
     want("D: AM23 = FALSE när avtalet täcker perioden", not P(b, KD, "AM23"))

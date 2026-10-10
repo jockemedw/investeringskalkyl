@@ -3,8 +3,8 @@
 Datum 2026-10-09. Beslut A–E (Joakim), dokumenterade som ANALYS_OMTAG beslut 11–15 och D-27.
 Kod: `step7_restvarde.py` (körs efter fas 2, före design), `regression.py` (nytt test `check_restvarde_v31`).
 
-**Status:** steg 1 grön (LibreOffice, `python build/lm371/lo_gate.py`, alla 9 kontroller inklusive källans
-baslinje). Steg 2 (Excel COM, `python build/lm371/build.py`) återstår. Se instruktionen sist.
+**Status:** `LM371_v3.xlsx` är byggd till v3.1 utan Excel (`build_xml.py`, se sist). Regressionsgaten är grön
+mot den färdiga filen: alla 9 kontroller, inklusive källans baslinje.
 
 ## Antaganden — mallexemplet (oförändrade)
 
@@ -54,13 +54,13 @@ tidigare dubbelräknat.
 
 ## Vakansfaktorns skala i exemplet (v3.1, B)
 
-| Bedömning | Δ yield | Justerad yield | Motsvarar (kolumn I) | Exit år 20 | IRR | NPV | Kravhyra |
+| Bedömning | Δ yield | Justerad yield | Motsv. vakans (kolumn I) | Exit år 20 | IRR | NPV | Kravhyra |
 |---|---|---|---|---|---|---|---|
-| Låg | −0,25 pp | 6,25 % | ≈ 3 % lägre vakans | 282,81 Mkr | 8,229 % | 12,42 Mkr | 2 541 |
-| Normal | 0 | 6,50 % | marknadsnormal | 271,94 Mkr | 8,080 % | 10,30 Mkr | 2 559 |
-| Förhöjd | +0,50 pp | 7,00 % | ≈ 6 % vakans | 252,51 Mkr | 7,803 % | 6,50 Mkr | 2 592 |
-| Hög | +1,00 pp | 7,50 % | ≈ 11 % vakans | 235,68 Mkr | 7,551 % | 3,20 Mkr | 2 621 |
-| Mycket hög | +2,00 pp | 8,50 % | ≈ 19 % vakans | 207,95 Mkr | 7,105 % | −2,22 Mkr | 2 671 |
+| Låg | −0,25 pp | 6,25 % | ≈ −3 % | 282,81 Mkr | 8,229 % | 12,42 Mkr | 2 541 |
+| Normal | 0 | 6,50 % | ≈ 0 % | 271,94 Mkr | 8,080 % | 10,30 Mkr | 2 559 |
+| Förhöjd | +0,50 pp | 7,00 % | ≈ 6 % | 252,51 Mkr | 7,803 % | 6,50 Mkr | 2 592 |
+| Hög | +1,00 pp | 7,50 % | ≈ 11 % | 235,68 Mkr | 7,551 % | 3,20 Mkr | 2 621 |
+| Mycket hög | +2,00 pp | 8,50 % | ≈ 19 % | 207,95 Mkr | 7,105 % | −2,22 Mkr | 2 671 |
 
 Kontroll av kalibreringen: i v3 gav 10 % vakansgrad efter avtalet en NPV på 3,87 Mkr via NPV-spårets
 restvärde. I v3.1 ger Hög (≈ 11 % vakans) 3,20 Mkr. Faktorn och motsvarande vakans i driftnettot ger nu
@@ -119,32 +119,33 @@ Kan bara verifieras i Excel (steg 2):
 - format och färger
 - utskrift: NPV-fliken får rad 84–90, och sidantalet ska kontrolleras
 
-## Steg 2 — instruktion (Joakim, Windows + Excel)
+## Hur filen byggdes — utan Excel
+
+Det ordinarie bygget (`build.py`) öppnar mallen i Excel via COM och kan bara köras på Windows med Excel.
+Molnmiljön har ingen Excel, och openpyxl förstör mallens x14-dropdowns. v3.1 byggs därför inkrementellt
+direkt i xlsx-paketets XML:
 
 ```bash
-git fetch origin claude/stoic-einstein-rg084f
-git checkout claude/stoic-einstein-rg084f
-git pull
-python build/lm371/build.py          # ~3 min; ska sluta med "REGRESSION GRÖN"
+python build/lm371/build_xml.py <v3-fil> <ut-fil>     # ops från step7_restvarde → XML, cachade värden, gate
 ```
 
-1. **Gaten.** Utskriften ska innehålla raden `v3.1: C7 = E79 = 271,940,000 ✓ … vakansgrad spärr/notis ✓`.
-   I Excel kontrollerar `check_restvarde_v31` även att valideringsformeln `=$AM$23+($P$23=0)>0` finns på
-   P23 (och motsvarande på P24–P27).
-   - Rött på `V3_IRR` eller `LEGACY_IRR` med avvikelse under 1e-6: avrundningsskillnad mellan
-     LibreOffice och Excel. Skicka utskriften, så pinnar jag om.
-   - Annat rött: skicka hela utskriften.
-2. **Skärmgranskning** (obligatorisk efter designändring):
-   `python build/oneshot/screenshot_sheets.py build/lm371/LM371_v3.xlsx --out <dir> --sheets "2. Kalkyldata,4. NPV,5. IRR"`.
-   Titta särskilt på:
-   - Flik 2 sektion 5: kolumnen *Motsvarar* (I), motiveringen i J:U och dropdownen på vakansraden
-     (Låg … Mycket hög).
-   - Flik 2 kolumn P: rubriken "Vakans efter avtal / år inom kalkylperioden".
-   - Flik 4 rad 84–90.
-3. **Manuellt i Excel:**
-   - Skriv 10 % i P23. Den ska avvisas med "Avtalet löper hela kalkylperioden …".
-   - Ändra N23 till 2035. Nu ska 10 % gå att skriva in.
-   - Välj Hög i G76. I76 ska visa "≈ 11 % vakans".
-4. **Utskrift:** `python build/oneshot/export_pdf.py <kopia av LM371_v3.xlsx>`. Räkna sidor i
-   `.print/*.pdf`. v3 hade 16 sidor; NPV-fliken (4 sidor) kan få en till av rad 84–90.
-5. **Committa** den byggda `build/lm371/LM371_v3.xlsx` och `print_preview.pdf` om den uppdaterats.
+1. `apply_xml.py` utför samma ops som `apply.ps1`: formler, format, merge, validering och utskriftsområde.
+   Bara berörda delar skrivs om. Kommentarer, VML, x14-valideringar, customXml och skrivarinställningar
+   kopieras byte för byte. Delade formelgrupper vars master skrivs över materialiseras först.
+2. Filen räknas om i LibreOffice med svenskt språkläge och emulerad datatabell. Resultaten skrivs in som
+   cachade värden i alla 57 327 formelceller, så filen visar rätt siffror även i läsare som inte räknar om.
+3. `fullCalcOnLoad` är satt, så Excel räknar om hela boken när filen öppnas. calcChain är borttagen och
+   byggs om av Excel.
+
+Hur tillförlitligt är det? På v3-filen ger LibreOffice samma värde som Excel i 57 018 av 57 022
+formelceller. De fyra avvikelserna var decimaltecken i texter, som är åtgärdat med svensk locale, och
+dagens datum (NOW). Strukturkontrollen (cellordning, delade formler, merge-överlapp) och gaten körs i
+`build_xml.py`.
+
+Det här kan inte kontrolleras utan Excel:
+- att Excel öppnar filen utan reparationsdialog
+- att utskriften blir exakt Excels sidbrytning
+- hur valideringsdialogerna beter sig
+
+Skärmbilden är granskad i LibreOffice-rendering. När bygget nästa gång körs med Excel (`build.py` från
+orörd mall) reproduceras samma innehåll av samma ops.

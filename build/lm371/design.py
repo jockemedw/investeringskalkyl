@@ -84,7 +84,7 @@ def ops_design() -> list[dict]:
     o += [_page(FS, PORTRAIT, A4, "$A$1:$H$138"),
           _page(KD, LANDSCAPE, A3, "$C$3:$U$81", tall=1),
           _page(FIN, LANDSCAPE, A3, "$A$3:$W$57", titles_cols="$A:$C", wide=2),
-          _page(NPV, LANDSCAPE, A3, "$B$1:$Y$90", titles_cols="$A:$C", wide=2),
+          _page(NPV, LANDSCAPE, A3, "$B$1:$Y$91", titles_cols="$A:$C", wide=2),
           _page(IRR, LANDSCAPE, A3, "$A$1:$W$61", titles_cols="$A:$C", wide=2),
           _page(ACK, LANDSCAPE, A3, "$A$1:$W$13", tall=1, titles_cols="$A:$B", wide=2),
           _page(GRAF, LANDSCAPE, A3, "$A$38:$W$57", tall=1, titles_cols="$A:$B", wide=2),
