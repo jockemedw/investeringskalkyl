@@ -367,6 +367,221 @@ class Book:
                 return
         raise ValueError(f"utskriftsområde saknas för {o['sheet']}")
 
+    # ── designops (v3.2) ──
+    def _xf_from(self, o, attr: str, apply_attr: str):
+        """Kopiera ett stilattribut (fillId/fontId/borderId) från källcellens xf, behåll resten."""
+        sh = self.sheet(o["sheet"])
+        sr, sc = rc(o["src"])
+        src = sh.find(sr, sc)
+        val = self.styles.find(q("cellXfs"))[int(src.get("s", "0")) if src is not None else 0].get(attr, "0")
+
+        def mutate(xf):
+            xf.set(attr, val)
+            xf.set(apply_attr, "1")
+        self._restyle(o, (attr, val), mutate)
+
+    def op_fill_from(self, o):
+        self._xf_from(o, "fillId", "applyFill")
+
+    def op_font_from(self, o):
+        self._xf_from(o, "fontId", "applyFont")
+
+    def op_border_from(self, o):
+        self._xf_from(o, "borderId", "applyBorder")
+
+    def op_fontcolor(self, o):
+        """color: 'white' | 'black' | 'grey' | 'RRGGBB'."""
+        fonts = self.styles.find(q("fonts"))
+        spec = o["color"]
+
+        def mutate(xf):
+            font = copy.deepcopy(fonts[int(xf.get("fontId", "0"))])
+            for el in font.findall(q("color")):
+                font.remove(el)
+            col = etree.Element(q("color"))
+            if spec == "white":
+                col.set("theme", "0")
+            elif spec == "black":
+                col.set("theme", "1")
+            elif spec == "grey":
+                col.set("rgb", "FF7F7F7F")
+            else:
+                col.set("rgb", "FF" + spec.upper())
+            # color placeras före name/family/scheme enligt CT_Font (b,i,strike,…,sz,color,name,family,charset,scheme)
+            anchor = next((font.find(q(t)) for t in ("name", "family", "charset", "scheme") if font.find(q(t)) is not None), None)
+            if anchor is not None:
+                anchor.addprevious(col)
+            else:
+                font.append(col)
+            fonts.append(font)
+            fonts.set("count", str(len(fonts)))
+            xf.set("fontId", str(len(fonts) - 1))
+            xf.set("applyFont", "1")
+        self._restyle(o, ("fontcolor", spec), mutate)
+
+    def op_numfmt(self, o):
+        """fmt = formatkod i XML-syntax (en-US: ',' tusental, '.' decimal) — Excel visar enligt svensk locale."""
+        st = self.styles
+        nf = st.find(q("numFmts"))
+        if nf is None:
+            nf = etree.Element(q("numFmts"))
+            st.insert(0, nf)
+        code = o["fmt"]
+        fid = next((int(n.get("numFmtId")) for n in nf if n.get("formatCode") == code), None)
+        if fid is None:
+            fid = max([163] + [int(n.get("numFmtId")) for n in nf]) + 1
+            etree.SubElement(nf, q("numFmt"), numFmtId=str(fid), formatCode=code)
+            nf.set("count", str(len(nf)))
+
+        def mutate(xf):
+            xf.set("numFmtId", str(fid))
+            xf.set("applyNumberFormat", "1")
+        self._restyle(o, ("numfmt", code), mutate)
+
+    def _cols(self, sh):
+        """Expandera <cols> till {kolumn: attrib} och returnera (cols-element, dict)."""
+        cols = sh.child("cols")
+        spec = {}
+        for col in cols.findall(q("col")):
+            for c in range(int(col.get("min")), int(col.get("max")) + 1):
+                spec[c] = {k: v for k, v in col.attrib.items() if k not in ("min", "max")}
+        return cols, spec
+
+    @staticmethod
+    def _write_cols(cols, spec):
+        for col in list(cols):
+            cols.remove(col)
+        run = None
+        for c in sorted(spec):
+            a = spec[c]
+            if run and run[1] == c - 1 and run[2] == a:
+                run[1] = c
+            else:
+                if run:
+                    etree.SubElement(cols, q("col"), min=str(run[0]), max=str(run[1]), **run[2])
+                run = [c, c, a]
+        if run:
+            etree.SubElement(cols, q("col"), min=str(run[0]), max=str(run[1]), **run[2])
+
+    def _colrange(self, ref):
+        c1, _, c2, _ = range_boundaries(ref.replace("$", "") if any(ch.isdigit() for ch in ref) else f"{ref.split(':')[0]}1:{ref.split(':')[-1]}1")
+        return range(c1, c2 + 1)
+
+    def op_colwidth(self, o):
+        sh = self.sheet(o["sheet"])
+        cols, spec = self._cols(sh)
+        for c in self._colrange(o["ref"]):
+            a = spec.setdefault(c, {})
+            a["width"] = repr(float(o["w"]))
+            a["customWidth"] = "1"
+        self._write_cols(cols, spec)
+
+    def _hide_cols(self, o, hidden: bool):
+        sh = self.sheet(o["sheet"])
+        cols, spec = self._cols(sh)
+        for c in self._colrange(o["ref"]):
+            a = spec.setdefault(c, {"width": "9.140625"})
+            if hidden:
+                a["hidden"] = "1"
+            else:
+                a.pop("hidden", None)
+        self._write_cols(cols, spec)
+
+    def op_hide_cols(self, o):
+        self._hide_cols(o, True)
+
+    def op_unhide_cols(self, o):
+        self._hide_cols(o, False)
+
+    def _rows_of(self, o):
+        ref = str(o.get("ref", o.get("row")))
+        a, _, b = ref.partition(":")
+        return range(int(re.sub(r"\D", "", a)), int(re.sub(r"\D", "", b or a)) + 1)
+
+    def _row_el(self, sh, r):
+        if r not in sh.rows:
+            sh.cell(r, 1)                                       # skapar raden (cellen A är tom och ofarlig)
+            row = sh.rows[r]
+            for c in row.findall(q("c")):
+                if c.get("r") == addr(r, 1) and not len(c) and "s" not in c.attrib:
+                    row.remove(c)
+        return sh.rows[r]
+
+    def op_rowheight(self, o):
+        sh = self.sheet(o["sheet"])
+        for r in self._rows_of(o):
+            row = self._row_el(sh, r)
+            row.set("ht", repr(float(o["h"])))
+            row.set("customHeight", "1")
+
+    def op_hide_rows(self, o):
+        sh = self.sheet(o["sheet"])
+        for r in self._rows_of(o):
+            self._row_el(sh, r).set("hidden", "1")
+
+    def op_unhide_rows(self, o):
+        sh = self.sheet(o["sheet"])
+        for r in self._rows_of(o):
+            self._row_el(sh, r).attrib.pop("hidden", None)
+
+    def op_dv_prompt(self, o):
+        """Inmatningsmeddelande (tooltip). Finns validering på exakt samma område uppdateras dess prompt."""
+        sh = self.sheet(o["sheet"])
+        dvs = sh.child("dataValidations")
+        ref = o["ref"].replace("$", "")
+        for dv in dvs.findall(q("dataValidation")):
+            if dv.get("sqref") == ref:
+                dv.set("showInputMessage", "1")
+                dv.set("promptTitle", o.get("prompt_title", ""))
+                dv.set("prompt", o["prompt"])
+                return
+        target = set(cells_in(ref))
+        for dv in dvs.findall(q("dataValidation")):
+            if target & set().union(*(set(cells_in(x)) for x in dv.get("sqref").split())):
+                raise ValueError(f"dv_prompt {ref} överlappar validering {dv.get('sqref')}")
+        etree.SubElement(dvs, q("dataValidation"), allowBlank="1", showInputMessage="1",
+                         promptTitle=o.get("prompt_title", ""), prompt=o["prompt"], sqref=ref)
+        dvs.set("count", str(len(dvs)))
+
+    def op_freeze(self, o):
+        """Lås rader ovanför och kolumner till vänster om ref (som Excels Frys fönsterrutor)."""
+        sh = self.sheet(o["sheet"])
+        sv = sh.root.find(q("sheetViews")).find(q("sheetView"))
+        for el in sv.findall(q("pane")) + sv.findall(q("selection")):
+            sv.remove(el)
+        r, c = rc(o["ref"])
+        xs, ys = c - 1, r - 1
+        if xs == 0 and ys == 0:
+            return
+        pane_name = "bottomRight" if xs and ys else ("bottomLeft" if ys else "topRight")
+        attrs = {"topLeftCell": o["ref"].replace("$", ""), "activePane": pane_name, "state": "frozen"}
+        if xs:
+            attrs["xSplit"] = str(xs)
+        if ys:
+            attrs["ySplit"] = str(ys)
+        sv.insert(0, etree.Element(q("pane"), **attrs))
+        etree.SubElement(sv, q("selection"), pane=pane_name, activeCell=o["ref"].replace("$", ""),
+                         sqref=o["ref"].replace("$", ""))
+
+    def op_page_setup(self, o):
+        """Delmängd: orient (1 stående/2 liggande), paper (8 A3/9 A4), fit_wide/fit_tall, area, foot_c."""
+        sh = self.sheet(o["sheet"])
+        ps = sh.child("pageSetup")
+        if "orient" in o:
+            ps.set("orientation", "portrait" if int(o["orient"]) == 1 else "landscape")
+        if "paper" in o:
+            ps.set("paperSize", str(o["paper"]))
+        if "fit_wide" in o or "fit_tall" in o:
+            ps.set("fitToWidth", str(o.get("fit_wide", 1)))
+            ps.set("fitToHeight", str(o.get("fit_tall", 0)))
+            pr = sh.child("sheetPr")
+            psp = pr.find(q("pageSetUpPr"))
+            if psp is None:
+                psp = etree.SubElement(pr, q("pageSetUpPr"))     # sist i CT_SheetPr (tabColor, outlinePr, pageSetUpPr)
+            psp.set("fitToPage", "1")
+        if "area" in o:
+            self.op_print_area({"sheet": o["sheet"], "area": o["area"]})
+
     def __getattr__(self, name):
         if name.startswith("op_"):
             raise NotImplementedError(f"{name[3:]} kräver Excel COM (apply.ps1)")
