@@ -125,7 +125,7 @@ def ops_design_v32() -> list[dict]:
     # ── V32-07 restvärdestabell och resultatblock i klartext ──
     o += [F(FS, "B65", '="Restvärdesbedömning — direktavkastning vid exit "&ROUND(' + K + '$M$11*100,2)&" % (marknad "'
                        '&ROUND(' + K + '$M$6*100,2)&" % "&IF(' + K + '$M$10>=0,"+","")&ROUND(' + K + '$M$10*100,2)&" pp)"'),
-          S(FS, "C66", "Direktavkastning"), S(FS, "E66", "Restvärde (exit)"), S(FS, "F66", "Kravhyra, kr/kvm"),
+          S(FS, "C66", "Direktavk."), S(FS, "E66", "Restvärde (exit)"), S(FS, "F66", "Kravhyra, kr/kvm"),
           op("wrap", FS, "B66:G66"), op("rowheight", FS, "66", h=30)]
     o += note(FS, "B71", "Känslighet: direktavkastningen vid exit ±1,00 pp. Raden Bedömt är kalkylens restvärde (4. NPV rad 84–90).")
     o += [op("bold", FS, "B71", on=False),
@@ -147,6 +147,7 @@ def ops_design_v32() -> list[dict]:
           S(FS, "B116", "Kommentar resultat och rekommendation:"),
           FMT(FS, "B117", "B92")]
     o += note(FS, "E72", "Hämtas från 2. Kalkyldata") + note(FS, "E98", "Hämtas från 3. Finansiering")
+    o.append(op("align", FS, "E98", h=CENTER))
 
     # ── V32-09 bilagor ──
     o += [S(FS, "B135", "2. Kalkyldata"), S(FS, "B136", "3. Finansiering"),
@@ -155,7 +156,7 @@ def ops_design_v32() -> list[dict]:
 
     # ── D2 flik 1: tomma objektrader visar inget i stället för 0 ──
     o += [NF(FS, "E17:E21", '#,##0" kvm";-#,##0" kvm";'), NF(FS, "F17:F21", '#,##0" kr";-#,##0" kr";'),
-          NF(FS, "G17:G21", '#,##0" kr/kvm";-#,##0" kr/kvm";')]
+          NF(FS, "G17:G22", '#,##0" kr/kvm";-#,##0" kr/kvm";')]
 
     # ── D12 BILD/KARTA blir diskreta hjälptexter ──
     for ref, txt in (("B35", "Bild – klistra in här"), ("E35", "Karta – klistra in här")):
@@ -222,6 +223,8 @@ def ops_design_v32() -> list[dict]:
                       "→ restvärdesbedömning (5). 3) Läs resultatet i Nyckeltal kalkyl (rad 12–17) och på flik 1."),
           S(KD, "C2", "Flik 3–7 räknas automatiskt; 3. Finansiering ändras bara efter OK från finansansvarig. "
                       "Röd kolumnrubrik = obligatoriskt fält som saknar värde."),
+          op("merge", KD, "C1:Q1"), op("merge", KD, "C2:Q2"), op("wrap", KD, "C1:C2"),
+          op("align", KD, "C1:C2", h=LEFT, v="top"),
           S(KD, "C20", "Ett objekt per rad (högst 5). Hyror i kr/kvm och år, kalkylstartens penningvärde. "
                        "Budget kr/kvm räknas fram från sektion 4."),
           S(KD, "C32", "Kr/kvm och år i kalkylstartens penningvärde. Befintligt gäller objekt av typ Bef/Omb/Ins/Mar, "
@@ -241,7 +244,8 @@ def ops_design_v32() -> list[dict]:
           S(KD, "K37", "Media"), S(KD, "K38", "Övr. förvaltning")]
 
     # ── V32-17 rubriker i hyrestabellen ──
-    o += [S(KD, "C22", "Byggnad/lokal/objekt"), S(KD, "I22", "Hyra, kr/kvm"), S(KD, "J22", "Index, andel av inflation"),
+    o += [op("wrap", KD, "I22:L22"), op("wrap", KD, "U22"),
+          S(KD, "C22", "Byggnad/lokal/objekt"), S(KD, "I22", "Hyra, kr/kvm"), S(KD, "J22", "Index, andel av inflation"),
           S(KD, "L22", "Totalhyra, kr/år"), S(KD, "M21", "Avtalsperiod"), S(KD, "M22", "Fr.o.m. år"),
           S(KD, "N22", "T.o.m. år"), S(KD, "U22", "Justering, kr/kvm"), S(KD, "Q10", "Fr.o.m. år"), S(KD, "R10", "T.o.m. år")]
 
@@ -249,7 +253,7 @@ def ops_design_v32() -> list[dict]:
     o += [S(KD, "N4", "Förutsättningar fastighet"), S(KD, "N6", "Tomträttsavgäld, kr/år"), S(KD, "N7", "Taxeringsvärde, kr"),
           S(KD, "N8", "Fastighetsskatt, %"), S(KD, "N9", "Bokfört värde, kr"), S(KD, "K10", "Justering (från sektion 5)"),
           P(KD, "M10", "Justering", "Summan av bedömningarna i sektion 5 Restvärdesbedömning (H79). Ändras där."),
-          S(KD, "R13", "← egen tid, år (valfri)"), op("italic", KD, "R13"),
+          S(KD, "R13", "← egen tid, år (valfri)"), op("italic", KD, "R13"), op("align", KD, "R13", h=LEFT),
           NF(KD, "Q13", '0" år"'), NF(KD, "Q17", '0" år"'),
           P(KD, "Q13", "Avskrivningstid befintligt", "Valfritt: återstående avskrivningstid i år för befintligt bokfört "
                                                      "värde (P9). Tomt = Avskrivningstid (P16)."),
@@ -262,7 +266,7 @@ def ops_design_v32() -> list[dict]:
 
     # ── V32-20 totalrad och avskrivningsetiketter ──
     o += [NF(KD, "L28", '#,##0" kr"'), NF(KD, "O28", '#,##0" kr"'), NF(KD, "T28", '#,##0" kr"'), NF(KD, "F28", "#,##0"),
-          FMT(KD, "C28", "C29"), S(KD, "C29", "Per kvm, viktat"),
+          FMT(KD, "D29", "C29"), S(KD, "C29", "Per kvm, viktat"), op("align", KD, "C29", h=LEFT),
           S(KD, "T5", "Avskrivning, %/år"), S(KD, "S8", "Övrigt 1"), S(KD, "S9", "Övrigt 2")]
 
     # ── V32-21 sektionsnumren med i utskriften ──
@@ -289,7 +293,7 @@ def ops_design_v32() -> list[dict]:
                        "värde används i 5. IRR; investeringen per år i 4. NPV."),
           op("rowheight", FIN, "4", h=68),
           S(FIN, "B7", "Ränta byggnadskreditiv (år 1)"), S(FIN, "B9", "Amortering per år"),
-          S(FIN, "D6", "Innebär"), op("align", FIN, "D6", h=CENTER), S(FIN, "D8", "Trappas upp linjärt till år 11"),
+          S(FIN, "D6", "Innebär"), op("align", FIN, "D6", h=CENTER), S(FIN, "D8", "Nås år 11"),
           op("colwidth", FIN, "B:B", w=31),
           S(FIN, "B14", "Kalkylår · belopp i kr"), S(FIN, "B15", "Investering (från 2. Kalkyldata)"),
           S(FIN, "B22", "Återstående skuld vid årets slut"), S(FIN, "B23", "Räntesats (trappas upp år 1–11)"),
@@ -303,17 +307,19 @@ def ops_design_v32() -> list[dict]:
     for r, txt in ((15, "→ 4. NPV"), (16, "→ 5. IRR"), (20, "→ 5. IRR"), (22, "→ 5. IRR"), (24, "→ 5. IRR"),
                    (27, "→ 7.Grafer"), (47, "→ 5. IRR"), (57, "→ 5. IRR")):
         o += note(FIN, f"C{r}", txt)
+    o += [op("fontcolor", FIN, "C22", color="D9D9D9"), op("fontcolor", FIN, "C27", color="D9D9D9"),   # på mörkblått band
+          op("bold", FIN, "C57", on=False)]
     # ── V32-26 dölj hjälprad/legacy-rad, dölj "0" i objektnamn; D2 nollor som streck ──
     o += [op("hide_rows", FIN, "12"), op("hide_rows", FIN, "36"),
           NF(FIN, "B31:B35", "0;-0;;@"), NF(FIN, "B41:B45", "0;-0;;@"), NF(FIN, "B51:B55", "0;-0;;@"),
           NF(FIN, "D15:BA17", NOLL_STRECK), NF(FIN, "D30:BA35", NOLL_STRECK)]
-    # ── V32-27 lås etikettkolumnerna ──
-    o.append(op("freeze", FIN, "D1"))
+    # V32-27 (lås etikettkolumner) utgår efter verifiering: sammanslagna ingresser och långa noter i kolumn B
+    # klipps vid låsningslinjen på skärm. v3.1:s låsning behålls — tas upp som beslut.
 
     # ── V32-28 4. NPV: beslutssiffran synlig ──
     o += [S(NPV, "B47", "NPV HELA FASTIGHETEN, krav 3"), op("wrap", NPV, "B47")]
     o += note(NPV, "F47", "Hela fastigheten inkl. Bef-objekt. PV TOTALT (rad 52) prövas mot bokfört värde i krav 3 (2. Kalkyldata D15).")
-    o += note(NPV, "F82", "← Krav 1: NPV tillkommande vid kalkylperiodens slut (kolumn E) ska vara ≥ 0. Förs till 2. Kalkyldata D13 och flik 1.")
+    o += note(NPV, "F82", "← Krav 1: NPV vid kalkylperiodens slut (kolumn E) ska vara ≥ 0. Förs till 2. Kalkyldata D13.")
     o += [op("bold", NPV, "F82"),
           P(NPV, "E82", "Krav 1 – NPV tillkommande", "Nuvärde av tillkommande driftnetto + restvärde (rad 88) minus PV "
                                                      "investering över hela kalkylperioden. Ska vara ≥ 0. Kravhyran på 2. Kalkyldata rad 17 är den hyra som ger 0 här."),
@@ -334,9 +340,10 @@ def ops_design_v32() -> list[dict]:
           op("print_titles", NPV, "A1", cols="$A:$B", rows="$4:$4"),
           op("page_order", NPV, "A1", order="overThenDown"),
           op("hide_rows", NPV, "3")]
-    o += note(NPV, "X10", "År 21: bara underlag för restvärdet") + [op("align", NPV, "X10", h=RIGHT)]
-    # ── V32-30 lås etikettkolumnen ──
-    o.append(op("freeze", NPV, "C5"))
+    o += note(NPV, "X10", "Sista kolumnen (år N+1): bara underlag för restvärdet") + [op("align", NPV, "X10", h=RIGHT)]
+    o += [op("align", NPV, r, h=LEFT, indent=1) for r in ("F47", "F59", "F62", "F82")]
+    o.append(op("colwidth", NPV, "B:B", w=40))          # etiketterna ryms när bara A:B upprepas i utskriften
+    # V32-30 (lås etikettkolumn) utgår efter verifiering — B2:K2 är sammanslagen över låsningslinjen.
 
     # ── V32-31 NPV-rubriker och radnamn ──
     o += [S(NPV, "B1", "Nettonuvärde (NPV)"),
@@ -361,7 +368,8 @@ def ops_design_v32() -> list[dict]:
           FMT(NPV, "E84", "F84:X84"),
           S(NPV, "B90", "Bruttohyra tillk. (underlag Motsv. vakans)"),
           S(NPV, "B91", "Kapitaliseringsbart driftnetto = fullt uthyrt (vakans efter avtal återlagd), exkl. extraordinärt UH. "
-                        "Restvärdet vid slutet av år t = driftnetto år t+1 / justerad direktavkastning.")]
+                        "Restvärdet vid slutet av år t = driftnetto år t+1 / justerad direktavkastning."),
+          op("fontcolor", NPV, "B91", color="grey")]
 
     # ── V32-32 5. IRR exit-blocket ──
     o += [S(IRR, "B5", "BERÄKNING AV EXIT-VÄRDE VID KALKYLPERIODENS SLUT"), S(IRR, "A5", "Vikt"),
@@ -406,17 +414,18 @@ def ops_design_v32() -> list[dict]:
                        "kassaflödet och jämförs med IRR-kravet på 2. Kalkyldata rad 14.\n\nRestvärdet vid kalkylperiodens slut "
                        "förs in som försäljningsvärde. Standard är rent marknadsvärde (driftnetto år N+1 / justerad "
                        "direktavkastning). Vikterna i kolumn A kan väga in återstående kapitalutlägg eller bokfört värde."),
-          op("freeze", IRR, "D1"),
-          op("print_titles", IRR, "A1", cols="$A:$B"), op("print_titles", FIN, "A1", cols="$A:$B")]
+          op("align", IRR, "I55", h=LEFT, indent=1), op("align", IRR, "E40", h=LEFT, indent=1)]
+    # D1 (upprepa bara A:B) gäller endast 4. NPV; flik 3 och 5 behåller $A:$C efter verifieringen
 
     # ── V32-36/37/38 6. Ack.kapitalutlägg ──
     o += [op("colwidth", ACK, "B:B", w=46),
           FMT(ACK, "A13", "B15:B17"), op("clear_contents", ACK, "A13"),
-          op("freeze", ACK, "C5"),
           FMT(ACK, "C3", "B3"), FMT(ACK, "C4", "B4"), op("align", ACK, "B3:B4", h=LEFT),
           S(ACK, "B3", "Belopp i kr"), S(ACK, "B4", "År i kalkylen"),
           S(ACK, "A2", "Visar hur mycket av investeringen, inklusive räntekrav på bundet kapital, som återstår att tjäna in "
-                       "år för år. När Ack. kapitalutlägg (sista raden) når 0 är kapitalet återvunnet. Belopp i kr."),
+                       "år för år. När Ack. kapitalutlägg (sista raden) når 0 är kapitalet återvunnet."),
+          op("merge", ACK, "A2:B2"), op("wrap", ACK, "A2"), op("align", ACK, "A2", h=LEFT, v="top"),
+          op("rowheight", ACK, "2", h=36),
           op("bold", ACK, "A2", on=False), op("italic", ACK, "A2"),
           S(ACK, "B6", "(-) Driftnetto (hela fastigheten, 4. NPV)"),
           S(ACK, "B9", "(-) Övriga intäkter/kostnader (5. IRR rad 24–25)"),
@@ -425,7 +434,10 @@ def ops_design_v32() -> list[dict]:
           S(ACK, "B13", "(=) Ack. kapitalutlägg (kvar att återvinna)"),
           op("italic", ACK, "B15:B17"), op("fontcolor", ACK, "B15:B17", color="grey"),
           S(ACK, "B15", "Tecknen (+)/(−) anger effekten på Ack. kapitalutlägg. Kassaflöde = rad 6 + 7 + 8. Räntekrav = "
-                        "föregående års Ack. kapitalutlägg × kalkylränta driftnetto (2. Kalkyldata M7)."),
+                        "föregående års Ack. kapitalutlägg × kalkylränta driftnetto (2. Kalkyldata M7); år 1 investeringen "
+                        "× samma ränta."),
+          op("wrap", ACK, "B15:B17"), op("align", ACK, "B15:B17", v="top"),
+          op("rowheight", ACK, "15", h=48), op("rowheight", ACK, "16", h=36), op("rowheight", ACK, "17", h=36),
           S(ACK, "B16", "Räntebidrag (rad 7, dold) ingår i Kassaflöde men inte i Ack. kapitalutlägg. Övriga intäkter/"
                         "kostnader (rad 9) ingår i Ack. kapitalutlägg men inte i Kassaflöde."),
           S(ACK, "B17", "Ack. kapitalutlägg används i 5. IRR rad 6. Med standardvikterna (0 % / 100 % / 0 %) påverkar "
@@ -441,7 +453,8 @@ def ops_design_v32() -> list[dict]:
                                               "är investeringen återbetald."),
           FMT(ACK, "B6", "B9"), FMT(ACK, "C6", "C9:BA9"),
           # D2 nollor som streck, D5 legacy-rad och år 22+ dolda
-          NF(ACK, "C5:W12", NOLL_STRECK), op("hide_rows", ACK, "7"), op("hide_cols", ACK, "X:BA")]
+          NF(ACK, "C5:W12", NOLL_STRECK), NF(ACK, "X5:BA13", "#,##0;-#,##0;"), op("hide_rows", ACK, "7")]
+    # år 22+ döljs inte: kalkylperioden kan vara längre än 20 år (P17 = avskrivningstid när Q17 är tom)
 
     # ── V32-39/40/41/42 7.Grafer (+ D1 en sida, D5 legacy dolt) ──
     o += [op("hide_rows", GRAF, "1:35"),
@@ -450,14 +463,13 @@ def ops_design_v32() -> list[dict]:
           {"op": "print_area", "sheet": GRAF, "area": "$A$36:$V$57"},
           op("page_setup", GRAF, "A1", fit_wide=1, fit_tall=1)]
     o += note(GRAF, "A37", "Inget fylls i här. Raderna hämtas från flik 3–5 och kan markeras för egna diagram (Infoga › "
-                           "Diagram). Rad 44 och 48 används av 4. NPV rad 34–35 – ändra inte. Kolumner efter år 21 är dolda – "
-                           "visa dem vid kalkylperiod över 20 år.")
+                           "Diagram). Rad 44 och 48 används av 4. NPV rad 34–35 – ändra inte.")
     o += [op("colwidth", GRAF, "B:B", w=42),
           S(GRAF, "B40", "Driftnetto tillkommande exkl. extraordinärt UH"), S(GRAF, "B42", "Kostnader exkl. extraordinärt UH"),
           S(GRAF, "B44", "Restvärde tillkommande, årets slut"), S(GRAF, "B47", "Ackumulerat driftnetto inkl. extraordinärt UH"),
           S(GRAF, "B50", "Driftnetto (= rad 40 per kvm)"), S(GRAF, "B51", "Intäkter (= rad 41 per kvm)"),
           S(GRAF, "B52", "Kostnader exkl. extraordinärt UH (= rad 42 per kvm)")]
-    o += note(GRAF, "B49", "Rad 40 och 44 avser tillkommande flöde (Bef = nollalternativ), övriga rader hela fastigheten. "
+    o += note(GRAF, "B49", "Rad 40, 44 och 50 avser tillkommande flöde (Bef = nollalternativ), övriga rader hela fastigheten. "
                            "Utan Bef-objekt sammanfaller de.")
     o += [P(GRAF, "B40", "Källa", "4. NPV rad 71 − rad 72. Driftnetto för tillkommande flöde (Bef = nollalternativ), exkl. extraordinärt UH."),
           P(GRAF, "B41", "Källa", "4. NPV rad 19 Nettohyra (efter vakans), hela fastigheten."),
@@ -478,8 +490,8 @@ def ops_design_v32() -> list[dict]:
           S(GRAF, "B38", "Kalenderår"), S(GRAF, "B39", "Kalkylår"),
           FMT(GRAF, "D13", "A38:W38", src_sheet=FIN), FMT(GRAF, "D14", "A39:W39", src_sheet=FIN),
           FMT(GRAF, "B51", "A51"), FMT(GRAF, "A53", "A52"), FMT(GRAF, "B44", "A44"),
-          op("freeze", GRAF, "C40"),
-          op("hide_rows", GRAF, "53:56"), op("hide_cols", GRAF, "X:BA")]
+          op("freeze", GRAF, "A40"),                      # bara årsrubrikerna låses (radlåsning som flik 4 och 6)
+          op("hide_rows", GRAF, "53:56")]
 
     # ── V32-43/44 Kontoplan RR ──
     o += [op("rowheight", KONTO, "1", h=23.25), FMT(KONTO, "A1", "E1", src_sheet=ACK), S(KONTO, "E1", "KONTOPLAN RR"),

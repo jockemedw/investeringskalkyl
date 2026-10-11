@@ -286,6 +286,8 @@ class Book:
             kw["horizontal"] = H_ALIGN[int(o["h"])]
         if "v" in o:
             kw["vertical"] = o["v"]                             # top | center | bottom
+        if "indent" in o:
+            kw["indent"] = str(int(o["indent"]))
         self._restyle(o, ("align",) + tuple(sorted(kw.items())), self._align(**kw))
 
     def op_wrap(self, o):
@@ -430,6 +432,15 @@ class Book:
 
     def op_numfmt(self, o):
         """fmt = formatkod i XML-syntax (en-US: ',' tusental, '.' decimal) — Excel visar enligt svensk locale."""
+        builtin = {"0": 1, "0.00": 2, "#,##0": 3, "#,##0.00": 4, "0%": 9, "0.00%": 10}
+        if o["fmt"] in builtin:                                 # inbyggt id → samma visning som mallens celler
+            fid_b = builtin[o["fmt"]]
+
+            def mutate_b(xf):
+                xf.set("numFmtId", str(fid_b))
+                xf.set("applyNumberFormat", "1")
+            self._restyle(o, ("numfmt", o["fmt"]), mutate_b)
+            return
         st = self.styles
         nf = st.find(q("numFmts"))
         if nf is None:
@@ -560,6 +571,7 @@ class Book:
             sv.remove(el)
         r, c = rc(o["ref"])
         xs, ys = c - 1, r - 1
+        sv.set("topLeftCell", "A1")                             # ySplit/xSplit räknas från vyns övre vänstra cell
         if xs == 0 and ys == 0:
             return
         pane_name = "bottomRight" if xs and ys else ("bottomLeft" if ys else "topRight")

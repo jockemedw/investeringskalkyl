@@ -211,4 +211,19 @@ Beslut som har tagits genom projektet, med motivering. Varje beslut är låst om
 
 ---
 
+## D-28: v3.2 — användarvänlighet och design via agentgranskning, utan beräkningsändringar
+**Beslut (Joakim 2026-10-11: "markant förbättring men man känner igen sig"):** 44 ändringar från agentgranskning
+(`step8_design.py`, V32-01 … V32-44) + presentationsbeslut med rekommendation (utskrift, nollor, legacy-rader,
+toner, kravhyrerad, NPV rad 59, EBITDA, källhänvisningar, projektnamn, BILD/KARTA). Etiketter, etikettformler (ren
+text), talformat, toner inom befintlig palett, inmatningsmeddelanden, döljning och utskrift — inga beräkningsformler.
+**Motivering:** Granskningen visade att mallen räknar rätt men inte förklarar sig: inmatningsmeddelanden saknades
+(och var avstängda på flik 1), krav 1/2/3 hette olika saker, stavfel och engelska rester syntes i chefens utskrift,
+utskriften delade tabeller.
+**Konsekvens:** Låsta etikettkolumner (V32-27/30/35/36) och döljning av år 22+ togs bort efter verifiering —
+klipper sammanslagna ingresser respektive döljer år när kalkylperioden > 20 år. Fyra ärvda formelfel ligger som
+beslut för separat formelrunda. Detaljer: [build/lm371/V32_RAPPORT.md](build/lm371/V32_RAPPORT.md).
+**Verifierat:** regression grön (oförändrade siffror), 7 verifieringsagenter + egen granskning av alla 15 sidor.
+
+---
+
 *Lägg till nya beslut längst ner med löpande nummer. Ändra ALDRIG befintliga — markera som "OMPRÖVAD i D-XX" om de ersätts.*
