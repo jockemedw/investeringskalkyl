@@ -259,12 +259,14 @@ class Book:
                 cell.attrib.pop("s", None)
 
     def op_fmt_from(self, o):
+        """Kopiera cellformat (stilindex är bokgemensamt; src_sheet för källa på annat blad)."""
         sh = self.sheet(o["sheet"])
+        ssh = self.sheet(o.get("src_sheet", o["sheet"]))
         sc1, sr1, sc2, sr2 = range_boundaries(o["src"].replace("$", ""))
         h, w = sr2 - sr1 + 1, sc2 - sc1 + 1
         dc1, dr1, _, _ = range_boundaries(o["dst"].replace("$", ""))
         for r, c in cells_in(o["dst"]):
-            src = sh.find(sr1 + (r - dr1) % h, sc1 + (c - dc1) % w)
+            src = ssh.find(sr1 + (r - dr1) % h, sc1 + (c - dc1) % w)
             s = src.get("s") if src is not None else None
             cell = sh.cell(r, c)
             if s is None:
@@ -279,25 +281,32 @@ class Book:
             cell.set("s", str(self.xf_with(int(cell.get("s", "0")), key, mutate)))
 
     def op_align(self, o):
-        h = H_ALIGN[int(o["h"])]
-        self._restyle(o, ("h", h), self._align(horizontal=h))
+        kw = {}
+        if "h" in o:
+            kw["horizontal"] = H_ALIGN[int(o["h"])]
+        if "v" in o:
+            kw["vertical"] = o["v"]                             # top | center | bottom
+        self._restyle(o, ("align",) + tuple(sorted(kw.items())), self._align(**kw))
 
     def op_wrap(self, o):
         self._restyle(o, ("wrap",), self._align(wrapText="1"))
 
     def _font_flag(self, o, tag: str):
-        """Kursiv/fet: klona cellens font med <i/>/<b/> och xf som pekar på den."""
+        """Kursiv/fet: klona cellens font med/utan <i/>/<b/> (on=False tar bort) och xf som pekar på den."""
         fonts = self.styles.find(q("fonts"))
+        on = o.get("on", True)
 
         def mutate(xf):
             font = copy.deepcopy(fonts[int(xf.get("fontId", "0"))])
-            if font.find(q(tag)) is None:
-                font.insert(0, etree.Element(q(tag)))
+            for el in font.findall(q(tag)):
+                font.remove(el)
+            if on:
+                font.insert(0 if tag == "b" else (1 if font.find(q("b")) is not None else 0), etree.Element(q(tag)))
             fonts.append(font)
             fonts.set("count", str(len(fonts)))
             xf.set("fontId", str(len(fonts) - 1))
             xf.set("applyFont", "1")
-        self._restyle(o, ("font", tag), mutate)
+        self._restyle(o, ("font", tag, on), mutate)
 
     def op_italic(self, o):
         self._font_flag(o, "i")
@@ -370,7 +379,7 @@ class Book:
     # ── designops (v3.2) ──
     def _xf_from(self, o, attr: str, apply_attr: str):
         """Kopiera ett stilattribut (fillId/fontId/borderId) från källcellens xf, behåll resten."""
-        sh = self.sheet(o["sheet"])
+        sh = self.sheet(o.get("src_sheet", o["sheet"]))
         sr, sc = rc(o["src"])
         src = sh.find(sr, sc)
         val = self.styles.find(q("cellXfs"))[int(src.get("s", "0")) if src is not None else 0].get(attr, "0")
@@ -581,6 +590,79 @@ class Book:
             psp.set("fitToPage", "1")
         if "area" in o:
             self.op_print_area({"sheet": o["sheet"], "area": o["area"]})
+
+    def op_footer_replace(self, o):
+        """Ersätt text i sidhuvud/sidfot (alla varianter) på bladet."""
+        sh = self.sheet(o["sheet"])
+        hf = sh.root.find(q("headerFooter"))
+        if hf is None:
+            return
+        for el in hf:
+            if el.text:
+                el.text = el.text.replace(o["find"], o["repl"])
+
+    def op_row_break(self, o):
+        """Manuell sidbrytning efter rad `after` (Excel: före rad after+1)."""
+        sh = self.sheet(o["sheet"])
+        rb = sh.child("rowBreaks")
+        ids = {b.get("id") for b in rb}
+        if str(o["after"]) not in ids:
+            etree.SubElement(rb, q("brk"), id=str(o["after"]), max="16383", man="1")
+        brks = sorted(rb, key=lambda b: int(b.get("id")))
+        for b in list(rb):
+            rb.remove(b)
+        for b in brks:
+            rb.append(b)
+        rb.set("count", str(len(rb)))
+        rb.set("manualBreakCount", str(sum(1 for b in rb if b.get("man") == "1")))
+
+    def op_print_titles(self, o):
+        """Utskriftsrubriker: cols '$A:$B' och/eller rows '$4:$4'."""
+        idx = str(self.sheet_names.index(o["sheet"]))
+        quoted = "'" + o["sheet"].replace("'", "''") + "'"
+        parts = [f"{quoted}!{x}" for x in (o.get("cols"), o.get("rows")) if x]
+        dns = self.wb.find(q("definedNames"))
+        for dn in dns:
+            if dn.get("name") == "_xlnm.Print_Titles" and dn.get("localSheetId") == idx:
+                dn.text = ",".join(parts)
+                return
+        el = etree.SubElement(dns, q("definedName"), name="_xlnm.Print_Titles", localSheetId=idx)
+        el.text = ",".join(parts)
+        items = sorted(dns, key=lambda d: (d.get("name").lower(), int(d.get("localSheetId", "-1"))))
+        for d in list(dns):
+            dns.remove(d)
+        for d in items:
+            dns.append(d)
+
+    def op_page_order(self, o):
+        self.sheet(o["sheet"]).child("pageSetup").set("pageOrder", o["order"])   # overThenDown | downThenOver
+
+    def op_x14_dv(self, o):
+        """x14-validering (listor med källa på annat blad). match = befintlig sqref; ny sqref/prompt/disablePrompts."""
+        sh = self.sheet(o["sheet"])
+        X14 = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"
+        XM = "http://schemas.microsoft.com/office/excel/2006/main"
+        coll = sh.root.find(f".//{{{X14}}}dataValidations")
+        if coll is None:
+            raise ValueError(f"inga x14-valideringar på {o['sheet']}")
+        if o.get("enable_prompts"):
+            coll.attrib.pop("disablePrompts", None)
+        if "match" not in o:
+            return
+        for dv in coll.findall(f"{{{X14}}}dataValidation"):
+            sq = dv.find(f"{{{XM}}}sqref")
+            if set(sq.text.split()) == set(o["match"].split()):
+                if "sqref" in o:
+                    sq.text = o["sqref"]
+                if "prompt" in o:
+                    dv.set("showInputMessage", "1")
+                    dv.set("promptTitle", o.get("prompt_title", ""))
+                    dv.set("prompt", o["prompt"])
+                if "error" in o:
+                    dv.set("showErrorMessage", "1")
+                    dv.set("error", o["error"])
+                return
+        raise ValueError(f"x14-validering {o['match']} saknas på {o['sheet']}")
 
     def __getattr__(self, name):
         if name.startswith("op_"):
