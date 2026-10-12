@@ -212,6 +212,7 @@ Beslut som har tagits genom projektet, med motivering. Varje beslut är låst om
 ---
 
 ## D-28: v3.2 — användarvänlighet och design via agentgranskning, utan beräkningsändringar
+*Delvis OMPRÖVAD i D-29 (inmatningsmeddelanden och grå förklaringsrader → anteckningar).*
 **Beslut (Joakim 2026-10-11: "markant förbättring men man känner igen sig"):** 44 ändringar från agentgranskning
 (`step8_design.py`, V32-01 … V32-44) + presentationsbeslut med rekommendation (utskrift, nollor, legacy-rader,
 toner, kravhyrerad, NPV rad 59, EBITDA, källhänvisningar, projektnamn, BILD/KARTA). Etiketter, etikettformler (ren
@@ -223,6 +224,22 @@ utskriften delade tabeller.
 klipper sammanslagna ingresser respektive döljer år när kalkylperioden > 20 år. Fyra ärvda formelfel ligger som
 beslut för separat formelrunda. Detaljer: [build/lm371/V32_RAPPORT.md](build/lm371/V32_RAPPORT.md).
 **Verifierat:** regression grön (oförändrade siffror), 7 verifieringsagenter + egen granskning av alla 15 sidor.
+
+## D-29: v3.3 — hjälptexter som anteckningar, inte som textrader och inmatningsmeddelanden
+**Beslut (Joakim 2026-10-12: "städning av alla hjälptexter … överväg vad som ska vara flytande anteckningar"):**
+Förklaringar ligger som Excel-anteckningar (röd hörnmarkering, visas när musen vilar på cellen) på rubriken eller
+radnamnet, en per begrepp — 76 nya. I bladet står bara rubriker, enheter och korta enradiga underrubriker/
+källhänvisningar. Inmatningsmeddelanden finns kvar bara på rullistor där valet behöver förklaras (flik 1 G11, flik 2
+E23:E27, G76, Q34:Q39); spärren P23:P27 behåller sitt felmeddelande. Mallens trådade kommentarer (flik 2) och
+anteckningar (flik 3 B7/B8) är orörda; den felplacerade mallanteckningen på flik 2 S22 har fått rätt innehåll.
+**Motivering:** v3.2 la samma vägledning tre gånger (grå rader, ~70 gula rutor vid klick, mallens kommentarer).
+Rutorna döljer celler medan man fyller i och de grå raderna gör utskriften plottrig. Anteckningar syns bara när man
+söker dem och skrivs inte ut.
+**Konsekvens:** `apply_xml.py` har fått op:arna `note` (skapar/ersätter anteckningar: commentsN.xml + VML-form, nya
+delar/rels/content types vid behov) och `dv_prompt_off`. Kolumnrubrikerna flik 2 P22/U22 klipps inte längre. Flik 6
+skrivs ut t.o.m. rad 13. Inga formler, värden eller valideringsregler ändrade. Kod: `build/lm371/step9_hjalptexter.py`.
+**Verifierat:** regression grön (oförändrade siffror), anteckningarna lästa i openpyxl och LibreOffice (alla 79 noter
+inkl. mallens), 15 utskriftssidor granskade.
 
 ---
 

@@ -1,7 +1,7 @@
 # LM 371 v3.2 — användarvänlighet och design (morgonrapport)
 
 Datum 2026-10-11/12. Produkt: `build/lm371/LM371_v3.xlsx` (nu v3.2). Kod: `step8_design.py`.
-Utskrift (LibreOffice-rendering): `build/lm371/print_preview_lo_v32.pdf`, 15 sidor (v3.1: 16).
+Utskrift (LibreOffice-rendering): 15 sidor (v3.1: 16); PDF:en ersatt av `print_preview_lo_v33.pdf` i v3.3.
 
 ## Kort
 
