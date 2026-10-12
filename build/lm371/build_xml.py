@@ -1,8 +1,11 @@
-"""LM 371 v3.1 utan Excel: applicera step7-ops direkt i XML på v3-filen och fyll cachade värden.
+"""LM 371 utan Excel: applicera ops direkt i XML på en byggd version och fyll cachade värden.
 
-    python build/lm371/build_xml.py <v3-bas.xlsx> <ut.xlsx>
+    python build/lm371/build_xml.py <bas.xlsx> <ut.xlsx> [modul:funktion ...]
 
-1. Ops från step7_restvarde (samma som build.py kör via Excel COM) appliceras med apply_xml.py.
+    v3 → v3.1:  build_xml.py v3.xlsx ut.xlsx step7_restvarde:ops_restvarde_v31 step7_restvarde:ops_historik_v31
+    v3.1 → v3.2: build_xml.py v31.xlsx ut.xlsx step8_design:ops_design_v32
+
+1. Ops från angivna stegfunktioner (samma som build.py kör via Excel COM) appliceras med apply_xml.py.
 2. Filen räknas om i LibreOffice (lo_gate.LO, datatabellen emulerad) och resultaten skrivs in som cachade värden
    i alla formelceller — filen visar rätt siffror även i läsare som inte räknar om. fullCalcOnLoad gör att
    Excel ändå räknar om allt vid öppning.
@@ -74,12 +77,21 @@ def lo_values(path: Path, wanted: dict[str, dict[str, str]]) -> dict[str, dict[s
     return out
 
 
-def build(base: Path, out: Path) -> None:
-    from step7_restvarde import ops_restvarde_v31, ops_historik_v31
-    b84 = Book(base).sheet("4. NPV").find(84, 2)
-    if b84 is not None and b84.find(q("is")) is not None:
-        raise SystemExit(f"{base.name} har redan v3.1-blocket (4. NPV!B84) — utgå från v3-filen.")
-    ops = ops_restvarde_v31() + ops_historik_v31()
+def load_ops(specs: list[str]) -> list[dict]:
+    import importlib
+    ops = []
+    for spec in specs:
+        mod, _, fn = spec.partition(":")
+        ops += getattr(importlib.import_module(mod), fn)()
+    return ops
+
+
+def build(base: Path, out: Path, specs: list[str]) -> None:
+    if any(s.startswith("step7_restvarde") for s in specs):
+        b84 = Book(base).sheet("4. NPV").find(84, 2)
+        if b84 is not None and b84.find(q("is")) is not None:
+            raise SystemExit(f"{base.name} har redan v3.1-blocket (4. NPV!B84) — utgå från v3-filen.")
+    ops = load_ops(specs)
     tmp = Path(tempfile.mkdtemp()) / "v31.xlsx"
     book = Book(base)
     book.apply(ops)
@@ -108,10 +120,10 @@ def gate(path: Path) -> None:
 
 
 def main() -> int:
-    if len(sys.argv) != 3:
+    if len(sys.argv) < 4:
         raise SystemExit(__doc__)
     base, out = Path(sys.argv[1]), Path(sys.argv[2])
-    build(base, out)
+    build(base, out, sys.argv[3:])
     gate(out)
     return 0
 

@@ -7,7 +7,7 @@ Beställare: Lejonfastigheter AB (kommunalt fastighetsbolag, Linköping).
 patchad via Excel COM (openpyxl förstör x14-valideringar och diagram). Fas 1 klar: restvärde =
 rent MV vid justerad yield, Bef = nollalternativ, investeringsmatris, känslighet, kravhyra som output.
 Bygg `python build/lm371/build.py` (ops i build.py + step4_bef/step5_kanslighet/step6_kravhyra/
-fas2_fixar/step7_restvarde/design, generisk applier `apply.ps1`, gate `regression.py`). Design-runda 2026-09-30: färgregel,
+fas2_fixar/step7_restvarde/step8_design/design, generisk applier `apply.ps1`, gate `regression.py`). Design-runda 2026-09-30: färgregel,
 dolda hjälpområden, utskrift 16 sidor (`build/lm371/print_preview.pdf`). Analys + beslut 1–10: [ANALYS_OMTAG.md](ANALYS_OMTAG.md).
 Lathundstillägg/ändringslogg: [build/lm371/LM371_v3.md](build/lm371/LM371_v3.md). COM-läxor: NumberFormat
 är lokal-känslig här (kopiera format från befintliga celler eller NumberFormatLocal), radinfogning
@@ -119,7 +119,8 @@ Status (senaste rad = överst):
 - [x] **OMTAG fas 1 (2026-09-30):** LM371_v3 steg 1–7 committade (9261d7d → 50c8cf2 + steg 7). Se ANALYS_OMTAG.md.
 - [x] **OMTAG design-runda (2026-09-30, 373efae):** `design.py` — mallens tretons-färger behålls (egen färgregel drogs tillbaka 2026-10-01 efter jämförelse mot originalet), hjälpområden dolda, enhetlig utskrift 3 308 → 16 sidor, alla flikar skärm- + PDF-granskade.
 - [x] **OMTAG fas 2 (2026-09-30):** F1–F6 formelfixar (hyresindex, CA-index, negativ exponent, LOOKUP, MROUND, 16 438 #REF!). Baslinje-IRR flyttad 8,026 → 8,032 % (legacy 6,298 → 6,306 %) av CA-fixen, pinnad i regression.py. Läxa: Range.Replace arbetar mot FormulaLocal — inga ',' eller funktionsnamn i replace-ops (comrun vägrar).
-- [ ] **v3.1 restvärdesmodell (2026-10-09, beslut A–E / ANALYS_OMTAG 11–15, D-27):** `step7_restvarde.py` — ett restvärde (flik 4 rad 84–90, år N+1) i alla krav, M8 = M6 + M9, vakansfaktor −0,25…+2,00 pp med ekvivalent vakans, vakansgrad bara inom kalkylperioden (spärr + notis), extraordinärt UH t.o.m. horisonten. Byggd utan Excel: `build_xml.py` (ops → XML via `apply_xml.py`, cachade värden från LibreOffice, fullCalcOnLoad) + gate grön via `lo_gate.py`. IRR-pinne 8,032 → 8,080 %. **Joakim kör inga skript** — Claude bygger och verifierar; Excel-COM-bygget (`build.py`) är kanoniskt när Excel finns.
+- [x] **v3.1 restvärdesmodell (2026-10-09, beslut A–E / ANALYS_OMTAG 11–15, D-27):** `step7_restvarde.py` — ett restvärde (flik 4 rad 84–90, år N+1) i alla krav, M8 = M6 + M9, vakansfaktor −0,25…+2,00 pp med ekvivalent vakans, vakansgrad bara inom kalkylperioden (spärr + notis), extraordinärt UH t.o.m. horisonten. Byggd utan Excel: `build_xml.py` (ops → XML via `apply_xml.py`, cachade värden från LibreOffice, fullCalcOnLoad) + gate grön via `lo_gate.py`. IRR-pinne 8,032 → 8,080 %. **Joakim kör inga skript** — Claude bygger och verifierar; Excel-COM-bygget (`build.py`) är kanoniskt när Excel finns.
+- [x] **v3.2 användarvänlighet och design (2026-10-11, D-28):** agentgranskning (8 flik- + 1 helhetsgranskare → syntes 44 ändringar) → `step8_design.py` → `build_xml.py` → 7 verifieringsagenter → fixar. Inga beräkningsändringar, regression grön, 15 sidor. Rapport + beslut för Joakim: `build/lm371/V32_RAPPORT.md`. Bygg v3.1→v3.2: `build_xml.py <v3.1> <ut> step8_design:ops_design_v32 step8_design:ops_historik_v32`.
 - [ ] **OMTAG fas 4 (separat beslut):** helobjektshantering (befintligt driftnetto + bokfört värde).
 
 Nästa: Joakim granskar LM371_v3.xlsx. Fas 3 (kravhyra) ingick i fas 1. Fas 4 = separat beslut.
