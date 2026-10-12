@@ -3,7 +3,8 @@
     python build/lm371/build_xml.py <bas.xlsx> <ut.xlsx> [modul:funktion ...]
 
     v3 → v3.1:  build_xml.py v3.xlsx ut.xlsx step7_restvarde:ops_restvarde_v31 step7_restvarde:ops_historik_v31
-    v3.1 → v3.2: build_xml.py v31.xlsx ut.xlsx step8_design:ops_design_v32
+    v3.1 → v3.2: build_xml.py v31.xlsx ut.xlsx step8_design:ops_design_v32 step8_design:ops_historik_v32
+    v3.2 → v3.3: build_xml.py v32.xlsx ut.xlsx step9_hjalptexter:ops_hjalptexter_v33 step9_hjalptexter:ops_historik_v33
 
 1. Ops från angivna stegfunktioner (samma som build.py kör via Excel COM) appliceras med apply_xml.py.
 2. Filen räknas om i LibreOffice (lo_gate.LO, datatabellen emulerad) och resultaten skrivs in som cachade värden

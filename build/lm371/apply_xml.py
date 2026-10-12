@@ -4,14 +4,15 @@ Används när Excel saknas (Linux/moln). Till skillnad från openpyxl skrivs bar
 allt annat i paketet (x14-valideringar, kommentarer, VML, customXml, skrivarinställningar) kopieras byte för
 byte. calcChain tas bort och fullCalcOnLoad sätts, så Excel räknar om hela boken vid öppning.
 
-Stöd: set, fmt_from, merge, unmerge, clear, clear_contents, align, wrap, dv_list, dv_custom, print_area
-(probe/scan ignoreras). Övriga ops (replace, insert_rows, datatable, fill, page_setup …) kräver Excel.
+Stöd: set, fmt_from, merge, unmerge, clear, clear_contents, align, wrap, dv_list, dv_custom, print_area, note
+(Excel-anteckningar), dv_prompt_off m.fl. (probe/scan ignoreras). Övriga ops (replace, insert_rows, datatable, fill, page_setup …) kräver Excel.
 
 Delade formler: skrivs en cell som är master i en delad formelgrupp materialiseras gruppens övriga celler
 först (openpyxl Translator), annars skulle de tappa sin formel.
 """
 from __future__ import annotations
 import copy
+import posixpath
 import re
 import zipfile
 from pathlib import Path
@@ -675,6 +676,203 @@ class Book:
                     dv.set("error", o["error"])
                 return
         raise ValueError(f"x14-validering {o['match']} saknas på {o['sheet']}")
+
+    # ── anteckningar (Excel-noter: commentsN.xml + VML-form) ──
+    def _rels(self, part: str):
+        rp = part.rsplit("/", 1)
+        rels_part = f"{rp[0]}/_rels/{rp[1]}.rels"
+        if rels_part not in self.parts:
+            self.parts[rels_part] = (b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+                                     b'<Relationships xmlns="' + PNS.encode() + b'"/>')
+            self.order.append(rels_part)
+        return rels_part, etree.fromstring(self.parts[rels_part])
+
+    def _note_parts(self, sheet: str) -> dict:
+        """{comments, vml}-delar för bladets noter; skapas (med rels, content type, legacyDrawing) vid behov."""
+        cache = self.__dict__.setdefault("_notes", {})
+        if sheet in cache:
+            return cache[sheet]
+        sh = self.sheet(sheet)
+        rels_part, rels = self._rels(sh.part)
+        base = sh.part.rsplit("/", 1)[0]
+
+        def target(rel):
+            t = rel.get("Target")
+            return t.lstrip("/") if t.startswith("/") else posixpath.normpath(posixpath.join(base, t))
+        com = next((target(r) for r in rels if r.get("Type").endswith("/comments")), None)
+        ld = sh.root.find(q("legacyDrawing"))
+        vml = None
+        if ld is not None:
+            vml = next(target(r) for r in rels if r.get("Id") == ld.get(f"{{{RNS}}}id"))
+        ids = [int(r.get("Id")[3:]) for r in rels if r.get("Id", "").startswith("rId") and r.get("Id")[3:].isdigit()]
+        nxt = max(ids, default=0) + 1
+        if vml is None:
+            used = set()
+            for n, b in self.parts.items():
+                if n.endswith(".vml"):
+                    used |= {int(x) for m in re.findall(rb'idmap[^>]*data="([^"]+)"', b) for x in m.split(b",")}
+            idmap = max(used | {8}) + 1
+            k = 1
+            while f"xl/drawings/vmlDrawing{k}.vml" in self.parts:
+                k += 1
+            vml = f"xl/drawings/vmlDrawing{k}.vml"
+            self.parts[vml] = (
+                '<xml xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" '
+                'xmlns:x="urn:schemas-microsoft-com:office:excel">\n <o:shapelayout v:ext="edit">\n  <o:idmap '
+                f'v:ext="edit" data="{idmap}"/>\n </o:shapelayout><v:shapetype id="_x0000_t202" coordsize="21600,21600" '
+                'o:spt="202"\n  path="m,l,21600r21600,l21600,xe">\n  <v:stroke joinstyle="miter"/>\n  <v:path '
+                'gradientshapeok="t" o:connecttype="rect"/>\n </v:shapetype>\n</xml>').encode()
+            self.order.append(vml)
+            rid = f"rId{nxt}"
+            nxt += 1
+            etree.SubElement(rels, f"{{{PNS}}}Relationship", Id=rid, Target="../drawings/" + vml.rsplit("/", 1)[1],
+                             Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing")
+            sh.child("legacyDrawing").set(f"{{{RNS}}}id", rid)
+        if com is None:
+            k = 1
+            while f"xl/comments{k}.xml" in self.parts:
+                k += 1
+            com = f"xl/comments{k}.xml"
+            self.parts[com] = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<comments xmlns="{NS}">'
+                               '<authors/><commentList/></comments>').encode()
+            self.order.append(com)
+            etree.SubElement(rels, f"{{{PNS}}}Relationship", Id=f"rId{nxt}", Target="../" + com.rsplit("/", 1)[1],
+                             Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments")
+            ct = etree.fromstring(self.parts["[Content_Types].xml"])
+            etree.SubElement(ct, f"{{{CT}}}Override", PartName="/" + com, ContentType=(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml"))
+            self.parts["[Content_Types].xml"] = etree.tostring(ct, xml_declaration=True, encoding="UTF-8",
+                                                               standalone=True)
+        self.parts[rels_part] = etree.tostring(rels, xml_declaration=True, encoding="UTF-8", standalone=True)
+        cache[sheet] = {"comments": com, "vml": vml}
+        return cache[sheet]
+
+    def _anchor(self, sheet: str, r: int, c: int, w_px: int, h_px: int) -> tuple[str, str]:
+        """VML-ankare (kol, px, rad, px …, nollbaserat) och style för en not w×h px till höger om cellen."""
+        sh = self.sheet(sheet)
+        fmt = sh.root.find(q("sheetFormatPr"))
+        dcw = float(fmt.get("defaultColWidth", fmt.get("baseColWidth", 8)) if fmt is not None else 8.43)
+        drh = float(fmt.get("defaultRowHeight", 15)) if fmt is not None else 15.0
+        widths = {}
+        cols = sh.root.find(q("cols"))
+        for col in (cols if cols is not None else []):
+            for i in range(int(col.get("min")), int(col.get("max")) + 1):
+                widths[i] = 0.0 if col.get("hidden") == "1" else float(col.get("width", dcw))
+
+        def cpx(i):
+            return int(widths.get(i, dcw) * 7 + 5) if widths.get(i, dcw) > 0 else 0
+
+        def rpx(i):
+            row = sh.rows.get(i)
+            if row is not None and row.get("hidden") == "1":
+                return 0
+            ht = row.get("ht") if row is not None else None
+            return round(float(ht if ht else drh) * 4 / 3)
+        lc, lo = c, 15                                      # nollbaserat: kolumnen till höger om cellen
+        x0 = sum(cpx(i) for i in range(1, c + 1)) + lo
+        rc_, ro = c, lo + w_px
+        while ro > cpx(rc_ + 1) and rc_ < 16000:
+            ro -= cpx(rc_ + 1)
+            rc_ += 1
+        tr, to = max(r - 2, 0), 10
+        y0 = sum(rpx(i) for i in range(1, tr + 1)) + to
+        br, bo = tr, to + h_px
+        while bo > rpx(br + 1) and br < 1048000:
+            bo -= rpx(br + 1)
+            br += 1
+        anchor = f"{lc}, {lo}, {tr}, {to}, {rc_}, {ro}, {br}, {bo}"
+        style = (f"position:absolute;margin-left:{x0 * 0.75:.2f}pt;margin-top:{y0 * 0.75:.2f}pt;"
+                 f"width:{w_px * 0.75:.2f}pt;height:{h_px * 0.75:.2f}pt;z-index:{len(self.__dict__.get('_notes', {})) + 1};"
+                 "visibility:hidden;mso-wrap-style:tight")
+        return anchor, style
+
+    def op_note(self, o):
+        """Anteckning (Excel-not) på en cell: rubrik (fet) + text. Befintlig vanlig not ersätts; trådade
+        kommentarer från mallen rörs inte (fel om cellen har en)."""
+        sheet, ref = o["sheet"], o["ref"].replace("$", "")
+        r, c = rc(ref)
+        parts = self._note_parts(sheet)
+        croot = etree.fromstring(self.parts[parts["comments"]])
+        authors, clist = croot.find(q("authors")), croot.find(q("commentList"))
+        author = o.get("author", "LM 371")
+        names = [a.text for a in authors]
+        if author not in names:
+            etree.SubElement(authors, q("author")).text = author
+            names.append(author)
+        text = etree.Element(q("text"))
+
+        def run(t, bold=False):
+            rr = etree.SubElement(text, q("r"))
+            pr = etree.SubElement(rr, q("rPr"))
+            if bold:
+                etree.SubElement(pr, q("b"))
+            etree.SubElement(pr, q("sz"), val="9")
+            etree.SubElement(pr, q("color"), indexed="81")
+            etree.SubElement(pr, q("rFont"), val="Tahoma")
+            etree.SubElement(pr, q("family"), val="2")
+            te = etree.SubElement(rr, q("t"))
+            te.text = t
+            te.set(XML_SPACE, "preserve")
+        if o.get("title"):
+            run(o["title"] + "\n", bold=True)
+        run(o["text"])
+        existing = next((cm for cm in clist if cm.get("ref") == ref), None)
+        if existing is not None:
+            if names[int(existing.get("authorId"))].startswith("tc="):
+                raise ValueError(f"note {sheet}!{ref}: cellen har en trådad kommentar")
+            existing.remove(existing.find(q("text")))
+            existing.append(text)
+            existing.set("authorId", str(names.index(author)))
+        else:
+            cm = etree.Element(q("comment"), ref=ref, authorId=str(names.index(author)), shapeId="0")
+            cm.append(text)
+            later = [x for x in clist if rc(x.get("ref")) > (r, c)]
+            (later[0].addprevious(cm) if later else clist.append(cm))
+            vml = self.parts[parts["vml"]].decode("utf-8")
+            idmap = int(re.search(r'idmap[^>]*data="(\d+)', vml).group(1))
+            ids = [int(x) for x in re.findall(r'id="_x0000_s(\d+)"', vml)]
+            sid = max(ids + [idmap * 1024]) + 1
+            full = (o.get("title", "") + "\n" + o["text"]).strip()
+            w_px = o.get("w", 300)
+            lines = sum(max(1, -(-len(p) * 6 // (w_px - 12))) for p in full.split("\n"))
+            h_px = o.get("h", lines * 15 + 16)
+            anchor, style = self._anchor(sheet, r, c, w_px, h_px)
+            shape = (f'<v:shape id="_x0000_s{sid}" type="#_x0000_t202" style=\'{style}\' fillcolor="infoBackground [80]" '
+                     'strokecolor="none [81]" o:insetmode="auto"><v:fill color2="infoBackground [80]"/>'
+                     '<v:shadow color="none [81]" obscured="t"/><v:path o:connecttype="none"/>'
+                     '<v:textbox style=\'mso-direction-alt:auto\'><div style=\'text-align:left\'></div></v:textbox>'
+                     '<x:ClientData ObjectType="Note"><x:MoveWithCells/><x:SizeWithCells/>'
+                     f'<x:Anchor>{anchor}</x:Anchor><x:AutoFill>False</x:AutoFill>'
+                     f'<x:Row>{r - 1}</x:Row><x:Column>{c - 1}</x:Column></x:ClientData></v:shape>')
+            i = vml.rfind("</xml>")
+            self.parts[parts["vml"]] = (vml[:i] + shape + "\n" + vml[i:]).encode("utf-8")
+        self.parts[parts["comments"]] = etree.tostring(croot, xml_declaration=True, encoding="UTF-8",
+                                                       standalone=True)
+
+    def op_dv_prompt_off(self, o):
+        """Ta bort inmatningsmeddelanden på ett område. Valideringar utan annan funktion tas bort helt."""
+        sh = self.sheet(o["sheet"])
+        dvs = sh.root.find(q("dataValidations"))
+        target = set(cells_in(o["ref"].replace("$", "")))
+        hit = False
+        for dv in list(dvs.findall(q("dataValidation")) if dvs is not None else []):
+            cells = set().union(*(set(cells_in(x)) for x in dv.get("sqref").split()))
+            if not cells & target:
+                continue
+            if not cells <= target:
+                raise ValueError(f"dv_prompt_off {o['ref']} delar validering {dv.get('sqref')}")
+            hit = True
+            for a in ("showInputMessage", "promptTitle", "prompt"):
+                dv.attrib.pop(a, None)
+            if dv.get("type") in (None, "none") and dv.find(q("formula1")) is None:
+                dvs.remove(dv)
+        if not hit:
+            raise ValueError(f"dv_prompt_off: inget inmatningsmeddelande på {o['sheet']}!{o['ref']}")
+        if dvs is not None:
+            if len(dvs):
+                dvs.set("count", str(len(dvs)))
+            else:
+                sh.root.remove(dvs)
 
     def __getattr__(self, name):
         if name.startswith("op_"):
